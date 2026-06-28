@@ -72,6 +72,14 @@ export default function PostsPage({ type }) {
           </div>
         </section>
 
+        {status === "error" ? (
+          <section className="card">
+            <p className="muted">加载帖子失败，请确认后端已启动。</p>
+          </section>
+        ) : (
+          <PostList posts={posts} emptyText={config.emptyText} />
+        )}
+
         {isAuthenticated() ? (
           <CreatePostForm defaultType={type} onSubmit={handleCreatePost} />
         ) : (
@@ -82,14 +90,6 @@ export default function PostsPage({ type }) {
               <Link to="/register">去注册</Link>
             </div>
           </section>
-        )}
-
-        {status === "error" ? (
-          <section className="card">
-            <p className="muted">加载帖子失败，请确认后端已启动。</p>
-          </section>
-        ) : (
-          <PostList posts={posts} emptyText={config.emptyText} />
         )}
       </div>
     </main>

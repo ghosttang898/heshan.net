@@ -2,15 +2,21 @@ package net.tonghehui.backend.post;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import net.tonghehui.backend.user.User;
 
 @Entity
 @Table(name = "posts")
@@ -38,6 +44,10 @@ public class Post {
 
     @Column
     private String yearRange;
+
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -103,6 +113,23 @@ public class Post {
 
     public void setYearRange(String yearRange) {
         this.yearRange = yearRange;
+    }
+
+    public String getAuthorUsername() {
+        return author != null ? author.getUsername() : null;
+    }
+
+    public String getAuthorDisplayName() {
+        return author != null ? author.getDisplayName() : null;
+    }
+
+    @JsonIgnore
+    public User getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(User author) {
+        this.author = author;
     }
 
     public LocalDateTime getCreatedAt() {

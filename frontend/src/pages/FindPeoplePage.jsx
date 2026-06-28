@@ -84,18 +84,6 @@ export default function FindPeoplePage() {
           </div>
         </section>
 
-        {isAuthenticated() ? (
-          <CreateFindPersonPostForm onSubmit={handleCreatePost} />
-        ) : (
-          <section className="card">
-            <p className="muted">登录后才能发布寻人帖子。</p>
-            <div className="nav-links">
-              <Link to="/login">去登录</Link>
-              <Link to="/register">去注册</Link>
-            </div>
-          </section>
-        )}
-
         <FindPersonFilters filters={filters} onChange={handleFilterChange} />
 
         {status === "error" ? (
@@ -107,6 +95,18 @@ export default function FindPeoplePage() {
             posts={visiblePosts}
             emptyText="没有匹配的寻人帖子，试试换个昵称、地点或年份。"
           />
+        )}
+
+        {isAuthenticated() ? (
+          <CreateFindPersonPostForm onSubmit={handleCreatePost} />
+        ) : (
+          <section className="card">
+            <p className="muted">登录后才能发布寻人帖子。</p>
+            <div className="nav-links">
+              <Link to="/login">去登录</Link>
+              <Link to="/register">去注册</Link>
+            </div>
+          </section>
         )}
       </div>
     </main>

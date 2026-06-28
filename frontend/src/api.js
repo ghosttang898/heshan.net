@@ -6,6 +6,12 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  const publicPaths = ["/health", "/auth/login", "/auth/register"];
+
+  if (publicPaths.includes(config.url)) {
+    return config;
+  }
+
   const token = getToken();
 
   if (token) {

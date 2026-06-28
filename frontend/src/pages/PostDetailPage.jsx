@@ -4,6 +4,8 @@ import { createComment, getComments, getPost } from "../api";
 import { getAuth, isAuthenticated, subscribeAuthChange } from "../auth";
 import AddCommentForm from "../components/AddCommentForm";
 import CommentList from "../components/CommentList";
+import SiteHeader from "../components/SiteHeader";
+import { formatUserName } from "../userName";
 
 export default function PostDetailPage() {
   const { id } = useParams();
@@ -57,9 +59,12 @@ export default function PostDetailPage() {
   if (status === "loading") {
     return (
       <main className="page">
-        <section className="card">
-          <p className="muted">正在加载帖子详情...</p>
-        </section>
+        <div className="stack">
+          <SiteHeader />
+          <section className="card">
+            <p className="muted">正在加载帖子详情...</p>
+          </section>
+        </div>
       </main>
     );
   }
@@ -67,13 +72,16 @@ export default function PostDetailPage() {
   if (status === "error" || !post) {
     return (
       <main className="page">
-        <section className="card">
-          <p className="muted">帖子不存在或加载失败。</p>
-          <div className="nav-links">
-            <Link to="/chat">聊天广场</Link>
-            <Link to="/find">寻人信息</Link>
-          </div>
-        </section>
+        <div className="stack">
+          <SiteHeader />
+          <section className="card">
+            <p className="muted">帖子不存在或加载失败。</p>
+            <div className="nav-links">
+              <Link to="/chat">聊天广场</Link>
+              <Link to="/find">寻人信息</Link>
+            </div>
+          </section>
+        </div>
       </main>
     );
   }
@@ -81,8 +89,15 @@ export default function PostDetailPage() {
   return (
     <main className="page">
       <div className="stack">
+        <SiteHeader />
         <section className="card">
           <div className="post-meta">
+            <span>发表人: {formatUserName(
+              post.authorDisplayName,
+              post.authorUsername,
+              "未记录",
+            )}</span>
+            <span> · </span>
             <span>{post.type}</span>
             <span> · </span>
             <span>{new Date(post.createdAt).toLocaleString()}</span>
@@ -99,16 +114,17 @@ export default function PostDetailPage() {
         </section>
         <section className="card">
           <h2>评论</h2>
-          <AddCommentForm
-            onSubmit={handleCreateComment}
-            isAuthenticated={isAuthenticated()}
-            displayName={auth?.displayName || "匿名用户"}
-          />
           {commentsStatus === "error" ? (
             <p className="muted">评论加载失败。</p>
           ) : (
             <CommentList comments={comments} />
           )}
+          <AddCommentForm
+            onSubmit={handleCreateComment}
+            isAuthenticated={isAuthenticated()}
+            displayName={auth?.displayName || "匿名用户"}
+            username={auth?.username}
+          />
         </section>
         <section className="card">
           <div className="nav-links">

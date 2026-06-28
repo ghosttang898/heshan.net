@@ -1,4 +1,6 @@
 ﻿import { Link } from "react-router-dom";
+import PostReplies from "./PostReplies";
+import { formatUserName } from "../userName";
 
 export default function FindPersonPostList({ posts, emptyText }) {
   if (posts.length === 0) {
@@ -19,6 +21,12 @@ export default function FindPersonPostList({ posts, emptyText }) {
         return (
           <article key={post.id} className="card post-card">
             <div className="post-meta">
+              <span>发表人: {formatUserName(
+                post.authorDisplayName,
+                post.authorUsername,
+                "未记录",
+              )}</span>
+              <span> · </span>
               <span>{post.type}</span>
               <span> · </span>
               <span>{createdAt}</span>
@@ -30,7 +38,10 @@ export default function FindPersonPostList({ posts, emptyText }) {
               {post.yearRange ? <span className="tag">年份: {post.yearRange}</span> : null}
             </div>
             <p className="post-content">{post.content}</p>
-            <Link to={`/posts/${post.id}`}>查看详情</Link>
+            <div className="post-actions">
+              <Link to={`/posts/${post.id}`}>查看详情</Link>
+            </div>
+            <PostReplies postId={post.id} />
           </article>
         );
       })}

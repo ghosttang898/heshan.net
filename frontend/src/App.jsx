@@ -8,13 +8,19 @@ import RegisterPage from "./pages/RegisterPage";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/chat" element={<PostsPage type="CHAT" />} />
-      <Route path="/find" element={<FindPeoplePage />} />
-      <Route path="/posts/:id" element={<PostDetailPage />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/chat" element={<PostsPage type="CHAT" />} />
+        <Route path="/find" element={<FindPeoplePage />} />
+        <Route path="/posts/:id" element={<PostDetailPage />} />
+      </Routes>
+      <footer className="site-footer">
+        <span>heshan.net</span>
+        <strong>Created by GhostTang</strong>
+      </footer>
+    </>
   );
 }

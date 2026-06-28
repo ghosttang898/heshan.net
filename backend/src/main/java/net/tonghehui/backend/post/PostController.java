@@ -2,6 +2,7 @@ package net.tonghehui.backend.post;
 
 import java.util.List;
 
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +31,7 @@ public class PostController {
     }
 
     @PostMapping
-    public Post createPost(@RequestBody Post post) {
-        return postService.create(post);
+    public Post createPost(@RequestBody Post post, Authentication authentication) {
+        return postService.create(post, authentication.getName());
     }
 }

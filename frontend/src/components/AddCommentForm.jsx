@@ -1,6 +1,12 @@
 import { useState } from "react";
+import { formatUserName } from "../userName";
 
-export default function AddCommentForm({ onSubmit, isAuthenticated, displayName }) {
+export default function AddCommentForm({
+  onSubmit,
+  isAuthenticated,
+  displayName,
+  username,
+}) {
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -19,7 +25,9 @@ export default function AddCommentForm({ onSubmit, isAuthenticated, displayName 
   return (
     <form className="form-grid" onSubmit={handleSubmit}>
       <p className="muted">
-        {isAuthenticated ? `当前身份: ${displayName}` : "当前身份: 匿名用户"}
+        {isAuthenticated
+          ? `当前身份: ${formatUserName(displayName, username)}`
+          : "当前身份: 匿名用户"}
       </p>
       <label className="field">
         <span>评论内容</span>
