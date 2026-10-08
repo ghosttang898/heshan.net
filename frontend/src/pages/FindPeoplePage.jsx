@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import CreateFindPersonPostForm from "../components/CreateFindPersonPostForm";
 import FindPersonFilters from "../components/FindPersonFilters";
 import FindPersonPostList from "../components/FindPersonPostList";
+import AdminLink from "../components/AdminLink";
 import { createPost, getPosts } from "../api";
 import { clearAuth, getAuth, isAuthenticated, subscribeAuthChange } from "../auth";
 
@@ -71,6 +72,7 @@ export default function FindPeoplePage() {
           <div className="nav-links">
             <Link to="/">首页</Link>
             <Link to="/chat">聊天广场</Link>
+            <AdminLink />
             {auth ? (
               <button className="button button-secondary" type="button" onClick={clearAuth}>
                 退出登录

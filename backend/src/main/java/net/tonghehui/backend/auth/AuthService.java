@@ -3,6 +3,7 @@ package net.tonghehui.backend.auth;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -10,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import net.tonghehui.backend.security.JwtService;
 import net.tonghehui.backend.user.User;
 import net.tonghehui.backend.user.UserRepository;
+import net.tonghehui.backend.user.Role;
 
 @Service
 public class AuthService {
@@ -50,10 +52,11 @@ public class AuthService {
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setDisplayName(displayName);
+        user.setRole(Role.USER);
 
         User savedUser = userRepository.save(user);
         String token = jwtService.generateToken(savedUser.getUsername());
-        return new AuthResponse(token, savedUser.getUsername(), savedUser.getDisplayName());
+        return new AuthResponse(token, savedUser.getUsername(), savedUser.getDisplayName(), savedUser.getRole());
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -67,13 +70,25 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required fields");
         }
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, request.getPassword()));
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, request.getPassword()));
+        } catch (AuthenticationException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        }
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
         String token = jwtService.generateToken(user.getUsername());
-        return new AuthResponse(token, user.getUsername(), user.getDisplayName());
+        return new AuthResponse(token, user.getUsername(), user.getDisplayName(), user.getRole());
     }
+
+    public CurrentUser currentUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+        return new CurrentUser(user.getId(), user.getUsername(), user.getDisplayName(), user.getRole());
+    }
+
+    public record CurrentUser(Long id, String username, String displayName, Role role) {}
 }

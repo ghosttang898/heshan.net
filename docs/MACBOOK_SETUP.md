@@ -1,6 +1,6 @@
 ﻿# MacBook Setup
 
-This guide helps move and run TongHeHui on macOS.
+This guide helps move and run heshan.net on macOS.
 
 ## 1. Copy The Project
 

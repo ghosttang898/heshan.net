@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getHealth } from "../api";
 import { clearAuth, getAuth, subscribeAuthChange } from "../auth";
 import logoLockup from "../assets/logo-heshan-lockup.png";
+import AdminLink from "../components/AdminLink";
 
 export default function LandingPage() {
   const [health, setHealth] = useState("loading");
@@ -33,6 +34,7 @@ export default function LandingPage() {
           <div className="nav-links">
             <Link to="/chat">聊天广场</Link>
             <Link to="/find">寻人信息</Link>
+            <AdminLink />
             {auth ? (
               <button className="button button-secondary" type="button" onClick={clearAuth}>
                 退出登录
@@ -48,7 +50,7 @@ export default function LandingPage() {
 
         <div className="hero-grid">
           <section className="hero-copy">
-            <p className="eyebrow">TongHeHui Community</p>
+            <p className="eyebrow">heshan.net Community</p>
             <h1>同鹤汇</h1>
             <p className="hero-lede">
               为鹤山旧友、同窗和街坊留下一个安静好用的线上广场。

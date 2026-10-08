@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import PostReplies from "./PostReplies";
 import { formatUserName } from "../userName";
+import IpLocationLabel from "./IpLocationLabel";
 
 export default function PostCard({ post }) {
   const createdAt = post.createdAt
@@ -19,6 +20,7 @@ export default function PostCard({ post }) {
         <span>{post.type}</span>
         <span> · </span>
         <span>{createdAt}</span>
+        <span> · </span><IpLocationLabel item={post} />
       </div>
       <h2>{post.title}</h2>
       <p className="post-content">{post.content}</p>

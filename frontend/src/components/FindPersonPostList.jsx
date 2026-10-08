@@ -1,6 +1,7 @@
 ﻿import { Link } from "react-router-dom";
 import PostReplies from "./PostReplies";
 import { formatUserName } from "../userName";
+import IpLocationLabel from "./IpLocationLabel";
 
 export default function FindPersonPostList({ posts, emptyText }) {
   if (posts.length === 0) {
@@ -30,6 +31,7 @@ export default function FindPersonPostList({ posts, emptyText }) {
               <span>{post.type}</span>
               <span> · </span>
               <span>{createdAt}</span>
+              <span> · </span><IpLocationLabel item={post} />
             </div>
             <h2>{post.title}</h2>
             <div className="post-tags">

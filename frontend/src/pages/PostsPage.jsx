@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import CreatePostForm from "../components/CreatePostForm";
 import PostList from "../components/PostList";
+import AdminLink from "../components/AdminLink";
 import { createPost, getPosts } from "../api";
 import { clearAuth, getAuth, isAuthenticated, subscribeAuthChange } from "../auth";
 
@@ -59,6 +60,7 @@ export default function PostsPage({ type }) {
             <Link to={type === "CHAT" ? "/find" : "/chat"}>
               {type === "CHAT" ? "寻人信息" : "聊天广场"}
             </Link>
+            <AdminLink />
             {auth ? (
               <button className="button button-secondary" type="button" onClick={clearAuth}>
                 退出登录

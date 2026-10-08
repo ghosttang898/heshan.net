@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import logoLockup from "../assets/logo-heshan-lockup.png";
+import AdminLink from "./AdminLink";
 
 export default function SiteHeader() {
   return (
@@ -11,6 +12,7 @@ export default function SiteHeader() {
         <Link to="/">首页</Link>
         <Link to="/chat">聊天广场</Link>
         <Link to="/find">寻人信息</Link>
+        <AdminLink />
       </div>
     </nav>
   );

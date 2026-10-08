@@ -1,4 +1,5 @@
 import { formatUserName } from "../userName";
+import IpLocationLabel from "./IpLocationLabel";
 
 export default function CommentList({ comments }) {
   if (comments.length === 0) {
@@ -13,6 +14,7 @@ export default function CommentList({ comments }) {
             <strong>{formatUserName(comment.displayName, comment.username)}</strong>
             <span> · </span>
             <span>{new Date(comment.createdAt).toLocaleString()}</span>
+            <span> · </span><IpLocationLabel item={comment} />
           </div>
           <p className="post-content">{comment.content}</p>
         </article>

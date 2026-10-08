@@ -20,7 +20,7 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="card">
-        <h1>同鹤汇 TongHeHui</h1>
+        <h1>同鹤汇 heshan.net</h1>
         <p>同鹤汇是一个简洁的全栈 Web 应用原型，用于后续功能开发与协作。</p>
         <p>
           后端健康状态: <strong>{health}</strong>

@@ -5,6 +5,12 @@ const api = axios.create({
   baseURL: "/api",
 });
 
+export default api;
+
+export function getCurrentUser() {
+  return api.get("/auth/me");
+}
+
 api.interceptors.request.use((config) => {
   const publicPaths = ["/health", "/auth/login", "/auth/register"];
 

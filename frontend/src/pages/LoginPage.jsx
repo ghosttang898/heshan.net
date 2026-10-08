@@ -1,11 +1,13 @@
 ﻿import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { login } from "../api";
 import { saveAuth } from "../auth";
 import SiteHeader from "../components/SiteHeader";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -29,7 +31,8 @@ export default function LoginPage() {
     try {
       const response = await login(formData);
       saveAuth(response.data);
-      navigate("/chat");
+      const destination = location.state?.from;
+      navigate(destination?.startsWith("/admin") ? destination : "/chat", { replace: true });
     } catch (requestError) {
       setError("登录失败，请检查用户名和密码。");
     } finally {

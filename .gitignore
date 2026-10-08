@@ -31,3 +31,7 @@ backend/target/
 # Temporary files
 tmp/
 temp/
+
+# Licensed geolocation databases stay outside Git.
+*.mmdb
+*.mmdb.gz

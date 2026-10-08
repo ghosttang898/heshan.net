@@ -6,6 +6,7 @@ import AddCommentForm from "../components/AddCommentForm";
 import CommentList from "../components/CommentList";
 import SiteHeader from "../components/SiteHeader";
 import { formatUserName } from "../userName";
+import IpLocationLabel from "../components/IpLocationLabel";
 
 export default function PostDetailPage() {
   const { id } = useParams();
@@ -101,6 +102,7 @@ export default function PostDetailPage() {
             <span>{post.type}</span>
             <span> · </span>
             <span>{new Date(post.createdAt).toLocaleString()}</span>
+            <span> · </span><IpLocationLabel item={post} />
           </div>
           <h1>{post.title}</h1>
           {post.type === "FIND_PERSON" ? (
