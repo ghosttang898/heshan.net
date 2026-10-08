@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, FileText, MessageSquare, UserPlus, FilePlus, MessagesSquare, RefreshCw } from "lucide-react";
+import { Users, FileText, MessageSquare, UserPlus, FilePlus, MessagesSquare, RefreshCw, ExternalLink } from "lucide-react";
 import { getDashboard } from "../api";
 import useAdminError from "../useAdminError";
 import StatCard from "../components/StatCard";
 import DataTable from "../components/DataTable";
 import StatusBadge from "../components/StatusBadge";
+import { CLOUDFLARE_ANALYTICS_DASHBOARD } from "../../analytics";
 
 const stats = [
   ["totalUsers", "用户总数", Users, "green"], ["totalPosts", "帖子总数", FileText, "blue"],
@@ -30,6 +31,12 @@ export default function AdminDashboardPage() {
     <div className="admin-page-heading"><div><h1>社区总览</h1><p>同鹤汇 heshan.net</p></div>
       <button className="admin-icon-button" title="刷新统计" aria-label="刷新统计" onClick={() => setRefresh(refresh + 1)}><RefreshCw size={18} /></button>
     </div>
+    <section className="admin-section admin-traffic" aria-labelledby="traffic-title">
+      <div><h2 id="traffic-title">网站流量统计</h2><h3>Cloudflare Web Analytics</h3>
+        <p>查看公开页面的浏览量、访客趋势和访问来源。</p></div>
+      <a className="admin-button admin-traffic-link" href={CLOUDFLARE_ANALYTICS_DASHBOARD} target="_blank" rel="noopener noreferrer">
+        查看详细统计<ExternalLink size={16} aria-hidden="true" /></a>
+    </section>
     {error ? <p className="admin-error" role="alert">{error}</p> : !data ? <p className="admin-state" role="status">正在加载统计...</p> : <>
       <div className="admin-stats">{stats.map(([key, label, Icon, tone]) => <StatCard key={key} label={label} value={data[key]} Icon={Icon} tone={tone} />)}</div>
       <section className="admin-section"><div className="admin-section-heading"><h2>最近帖子</h2><Link to="/admin/posts">全部帖子</Link></div>

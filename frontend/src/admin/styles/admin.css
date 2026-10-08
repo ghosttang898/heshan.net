@@ -81,6 +81,10 @@ html:has(.admin-shell), html:has(.admin-access) { background: #f5f6f8; }
 .admin-row-actions { display: flex; gap: 8px; min-width: 80px; }
 .admin-user-table .admin-table { min-width: 780px; }
 .admin-management-link { margin-bottom: 18px; }
+.admin-traffic { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-top: 1px solid #e0e4e9; border-bottom: 1px solid #e0e4e9; }
+.admin-traffic p { margin: 8px 0 0; color: #707c8c; }
+.admin-traffic h3 { margin: 8px 0 0; font-size: 14px; color: #707c8c; }
+.admin-shell .admin-traffic-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: #fff; white-space: nowrap; }
 .admin-notice { color: #17664f; background: #e8f3ed; padding: 12px 16px; border-radius: 5px; overflow-wrap: anywhere; }
 .admin-role-dialog { width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dce1e7; border-radius: 6px; background: #fff; color: #252b35; font-size: 14px; }
 .admin-role-dialog::backdrop { background: #18222855; }
