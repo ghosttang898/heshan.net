@@ -24,6 +24,17 @@ backend/target/
 .env
 .env.local
 .env.*.local
+.env.*
+*.env
+rclone.conf
+*.key
+!.env.example
+!**/.env.example
+*.dump
+*.sql.gz
+*.mv.db
+*.trace.db
+backups/
 
 # Java
 *.class

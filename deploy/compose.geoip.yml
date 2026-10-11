@@ -1,0 +1,11 @@
+# Optional local licensed/public City MMDB. Absence does not block publication.
+services:
+  backend:
+    environment:
+      APP_GEOLOCATION_DATABASE_PATH: /opt/geoip/city.mmdb
+    volumes:
+      - type: bind
+        source: ${GEOIP_DATABASE_FILE:?approved database file required}
+        target: /opt/geoip/city.mmdb
+        read_only: true
+        bind: {create_host_path: false}

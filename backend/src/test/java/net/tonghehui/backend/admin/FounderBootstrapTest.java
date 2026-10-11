@@ -25,7 +25,7 @@ class FounderBootstrapTest {
             var service = context.getBean(FounderBootstrapService.class);
             assertThatThrownBy(() -> service.initialize(id, "ghost", id + 1, "ghost")).isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> service.initialize(id + 1, "ghost", id + 1, "ghost")).isInstanceOf(IllegalArgumentException.class);
-            owner.setUsername("not-ghost"); users.saveAndFlush(owner);
+            owner.setUsername("different-owner"); users.saveAndFlush(owner);
             assertThatThrownBy(() -> service.initialize(id, "ghost", id, "ghost")).isInstanceOf(IllegalArgumentException.class);
             assertThat(users.findById(id).orElseThrow().getRole()).isEqualTo(Role.USER);
             owner.setUsername("ghost"); users.saveAndFlush(owner);
@@ -44,5 +44,41 @@ class FounderBootstrapTest {
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("already");
         }
         assertThat(Files.exists(directory.resolve("owner-test.mv.db"))).isTrue();
+    }
+
+    @Test void anyConfirmedOwnerNameWorksButInvalidConfirmationNeverChangesData() {
+        var app = new SpringApplication(FounderBootstrapCommand.BootstrapConfiguration.class);
+        app.setWebApplicationType(WebApplicationType.NONE);
+        app.setAdditionalProfiles("founder-bootstrap");
+        try (var context = app.run("--spring.datasource.url=jdbc:h2:file:" + directory.resolve("arbitrary-owner"),
+                "--spring.jpa.show-sql=false")) {
+            var users = context.getBean(UserRepository.class);
+            var user = new User(); user.setUsername("verified-owner"); user.setDisplayName("Owner");
+            user.setPassword("unused-fixture"); var id = users.saveAndFlush(user).getId();
+            var service = context.getBean(FounderBootstrapService.class);
+            assertThatThrownBy(() -> service.initialize(id, null, id, null)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.initialize(id, " ", id, " ")).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.initialize(id, "verified-owner", id, "other")).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.initialize(id, "wrong-name", id, "wrong-name")).isInstanceOf(IllegalArgumentException.class);
+            assertThat(users.findById(id).orElseThrow().getRole()).isEqualTo(Role.USER);
+            assertThat(context.getBean(FounderIdentityRepository.class).count()).isZero();
+            assertThat(context.getBean(RoleChangeAuditRepository.class).count()).isZero();
+            service.initialize(id, "verified-owner", id, "verified-owner");
+            assertThat(users.findById(id).orElseThrow().getRole()).isEqualTo(Role.SUPER_ADMIN);
+            assertThat(context.getBean(RoleChangeAuditRepository.class).count()).isEqualTo(1);
+        }
+    }
+
+    @Test void memoryDatabaseAndMissingCommandOptionsAreRejected() {
+        assertThatThrownBy(() -> FounderBootstrapCommand.run(new String[]{"--initialize-founder"}))
+                .isInstanceOf(IllegalArgumentException.class);
+        var app = new SpringApplication(FounderBootstrapCommand.BootstrapConfiguration.class);
+        app.setWebApplicationType(WebApplicationType.NONE);
+        app.setAdditionalProfiles("founder-bootstrap");
+        try (var context = app.run("--spring.datasource.url=jdbc:h2:mem:founder-reject", "--spring.jpa.show-sql=false")) {
+            assertThatThrownBy(() -> context.getBean(FounderBootstrapService.class).initialize(1L, "owner", 1L, "owner"))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("persistent");
+            assertThat(context.getBean(FounderIdentityRepository.class).count()).isZero();
+        }
     }
 }

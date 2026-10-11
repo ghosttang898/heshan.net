@@ -47,7 +47,7 @@ public class IpGeolocationService {
         DatabaseReader loaded = null;
         if (!path.isBlank()) {
             try {
-                loaded = new DatabaseReader.Builder(new File(path)).fileMode(FileMode.MEMORY)
+                loaded = new DatabaseReader.Builder(new File(path)).fileMode(FileMode.MEMORY_MAPPED)
                         .locales(List.of("zh-CN", "en")).build();
             } catch (IOException | RuntimeException exception) {
                 LOG.warn("IP location database unavailable; publishing will continue without location");

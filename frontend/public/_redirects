@@ -1,0 +1,13 @@
+/chat /index.html 200
+/chat/ /index.html 200
+/find /index.html 200
+/find/ /index.html 200
+/privacy /index.html 200
+/privacy/ /index.html 200
+/login /index.html 200
+/login/ /index.html 200
+/register /index.html 200
+/register/ /index.html 200
+/posts/* /index.html 200
+/admin /index.html 200
+/admin/* /index.html 200

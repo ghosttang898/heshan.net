@@ -5,6 +5,7 @@ const { chromium } = require("playwright");
 const preview = process.env.TEST_PREVIEW_URL || "http://127.0.0.1:5174";
 const dev = process.env.TEST_DEV_URL || "http://127.0.0.1:5173";
 const origin = "https://heshan.net";
+const apiOrigin = new URL(process.env.TEST_API_BASE_URL || "https://api.heshan.net/api").origin;
 const scriptUrl = "https://static.cloudflareinsights.com/beacon.min.js";
 const secret = "sensitive-query-marker";
 const user = { id: 1, username: "private-user-marker", displayName: "private-name-marker", role: "ADMIN", token: "private-jwt-marker", email: "private-email-marker@example.test" };
@@ -35,16 +36,21 @@ async function setup(browser, beacon, fallback = false) {
       return route.fulfill({ status: 204, headers: { "access-control-allow-origin": origin,
         "access-control-allow-credentials": "true", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type" } });
     }
-    if ([origin, new URL(preview).origin, new URL(dev).origin].includes(url.origin)) {
-      if (url.pathname.startsWith("/api/")) {
+    if ([origin, apiOrigin, new URL(preview).origin, new URL(dev).origin].includes(url.origin)
+        && url.pathname.startsWith("/api/")) {
         let data;
         if (url.pathname === "/api/health") data = { status: "ok" };
         else if (url.pathname.startsWith("/api/auth/")) data = user;
         else if (url.pathname === "/api/admin/dashboard") data = dashboard;
         else if (/^\/api\/posts\/\d+$/.test(url.pathname)) data = { id: 1, title: "测试帖子", content: "公开内容", type: "CHAT", createdAt: "2026-10-01T12:00:00" };
         else data = [];
-        return route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
-      }
+        return route.fulfill({ contentType: "application/json", body: JSON.stringify(data), headers: {
+          "access-control-allow-origin": request.headers().origin || origin,
+          "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+          "access-control-allow-headers": "authorization, content-type",
+        } });
+    }
+    if ([origin, new URL(preview).origin, new URL(dev).origin].includes(url.origin)) {
       if (request.isNavigationRequest()) documents.push(url.pathname);
       const localUrl = url.origin === origin ? preview + url.pathname + url.search : url.href;
       return route.fulfill({ response: await context.request.get(localUrl) });

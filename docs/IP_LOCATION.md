@@ -49,7 +49,7 @@ Localhost/private requests deliberately show unknown even with a database instal
 Do not trust loopback merely to make a browser-supplied X-Forwarded-For header work in development.
 
 Download and validate the new database monthly. Atomically replace it, then restart the backend
-to load the new copy; no hot reload is implemented. The reader loads the file into memory once,
+to load the new copy; no hot reload is implemented. The reader memory-maps the local database,
 so allow roughly the uncompressed database size plus reader/JVM overhead (October 2026 file about 121 MB).
 H2 is currently in-memory: restarting also removes community data; schedule changes appropriately
 and use the existing administrator bootstrap if needed. Historical snapshots are never recalculated.

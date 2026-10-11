@@ -61,20 +61,25 @@ database credentials, backups, and externally retained audit copies in productio
 are not cryptographically tamper-proof against a database/server administrator.
 
 Hibernate `ddl-auto=update` adds the schema locally. Production requires backups and a reviewed
-schema migration. The current driver is H2 only; external database support was not added.
+schema migration. PostgreSQL/Flyway support and production validation are now prepared;
+see [Production preparation](PRODUCTION.md). Local H2 behavior remains available.
 
 ## One-Time Founder Initialization
 
 This command is NOT executed by normal startup and has no HTTP endpoint. It does not reset
 passwords, create accounts, promote by username alone, or grant a second SUPER_ADMIN.
-Only the exact confirmed existing account ID and username `ghost` are accepted.
+Only an explicitly confirmed existing account ID and matching exact username are accepted.
+The username is supplied by the operator, never hardcoded or automatically matched.
+`ghost` is only the owner's current plan, not an authorization rule.
 
 1. Obtain the owner's confirmation before doing anything. Choose persistent storage and migrate
    any data that must be preserved. Changing the JDBC URL does not migrate the existing memory DB.
 2. On the private server, configure a persistent H2 file, for example
    `SPRING_DATASOURCE_URL=jdbc:h2:file:/absolute/private/path/heshan` plus a private database password.
    Use the same datasource credentials/path for the application and command. Do not commit secrets.
-   The guard reads the actual JDBC metadata URL and only accepts `jdbc:h2:file:` in this version.
+   The guard reads actual JDBC metadata and accepts `jdbc:h2:file:` or `jdbc:postgresql://`.
+   PostgreSQL production initialization must use the reviewed migration/configuration
+   in [Production preparation](PRODUCTION.md); memory H2 remains forbidden.
 3. Have the owner register normally, then verify **both** account ID and exact username using the
    existing admin Users view/API or a private read-only database query. A public registrant claiming
    `ghost` is not proof of ownership. Independently verify the owner controls the intended account.
@@ -148,7 +153,8 @@ No Playwright dependency was added to the application itself. Screenshots are sa
 ## Known Limits
 
 No Web creation of a second super admin, account bans/deletions, or audit browsing UI.
-No migration to production SQL, tamper-proof audit infrastructure, or JWT username rename scheme.
+Production SQL is prepared but not deployed or validated against a live PostgreSQL here;
+there is no tamper-proof audit infrastructure or JWT username rename scheme.
 Renaming an account invalidates its existing username-based JWT; founder ID protection still applies.
 The default memory DB and development JWT key are unsuitable for formal authorization/production.
 SUPER_ADMIN live UI cannot be exercised by a real owner until persistent storage and explicit

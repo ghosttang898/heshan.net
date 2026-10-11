@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-bookworm
+    pull_policy: never
+    environment:
+      POSTGRES_DB: heshan_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${TEST_ADMIN_PASSWORD:?required}
+      APP_DB_USER: integration_app
+      APP_DB_PASSWORD: ${TEST_APP_PASSWORD:?required}
+    command: [postgres, -c, shared_buffers=64MB, -c, max_connections=20, -c, work_mem=2MB, -c, log_statement=none, -c, log_min_error_statement=panic]
+    volumes:
+      - test_data:/var/lib/postgresql/data
+      - type: bind
+        source: ../../deploy/postgres-init.sh
+        target: /docker-entrypoint-initdb.d/10-app-user.sh
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [isolated]
+    mem_limit: 384m
+    cpus: 0.35
+    pids_limit: 100
+    shm_size: 64m
+    restart: "no"
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U integration_app -d heshan_test']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+  backend:
+    image: ${TEST_BACKEND_IMAGE:?required}
+    pull_policy: never
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/heshan_test
+      DB_USER: integration_app
+      DB_PASSWORD: ${TEST_APP_PASSWORD:?required}
+      APP_JWT_SECRET: ${TEST_JWT_SECRET:?required}
+      APP_CORS_ALLOWED_ORIGINS: https://isolated-test.invalid
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx320m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=32m -Duser.timezone=UTC
+    networks: [isolated]
+    mem_limit: 768m
+    cpus: 0.60
+    pids_limit: 120
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - "/tmp:size=64m,mode=1777"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "4", http://127.0.0.1:8080/actuator/health]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+volumes:
+  test_data:
+networks:
+  isolated:
+    internal: true

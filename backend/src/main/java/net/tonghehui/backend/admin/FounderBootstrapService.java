@@ -29,15 +29,16 @@ public class FounderBootstrapService {
     public void initialize(Long id, String username, Long confirmedId, String confirmedUsername) {
         // Check the actual connection, not an environment variable that might be overridden.
         try (var connection = dataSource.getConnection()) {
-            if (!connection.getMetaData().getURL().startsWith("jdbc:h2:file:")) {
-                throw new IllegalStateException("Founder initialization requires a persistent H2 file database");
+            String url = connection.getMetaData().getURL();
+            if (!url.startsWith("jdbc:h2:file:") && !url.startsWith("jdbc:postgresql://")) {
+                throw new IllegalStateException("Founder initialization requires persistent PostgreSQL or H2 file storage");
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Cannot verify persistent database", exception);
         }
-        if (id == null || id <= 0 || !id.equals(confirmedId) || !"ghost".equals(username)
+        if (id == null || id <= 0 || !id.equals(confirmedId) || username == null || username.isBlank()
                 || !username.equals(confirmedUsername)) {
-            throw new IllegalArgumentException("Confirm both the owner user ID and exact username ghost");
+            throw new IllegalArgumentException("Confirm both the owner user ID and exact username");
         }
         if (founders.existsById(1L) || users.existsByRole(Role.SUPER_ADMIN)) {
             throw new IllegalStateException("Founder initialization has already been completed; no second SUPER_ADMIN is allowed");
