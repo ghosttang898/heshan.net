@@ -31,10 +31,22 @@ rclone.conf
 !.env.example
 !**/.env.example
 *.dump
+*.dump.sha256
 *.sql.gz
 *.mv.db
 *.trace.db
 backups/
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+.ssh/
+__pycache__/
+*.py[cod]
+test-results/
+playwright-report/
 
 # Java
 *.class

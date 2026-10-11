@@ -1,0 +1,28 @@
+# FUTURE host Nginx template only. Do not install before owner approval and staging.
+# Certificate files must exist; this file neither requests certificates nor changes DNS.
+server {
+    listen 80;
+    server_name api.heshan.net;
+    access_log off;
+    return 308 https://api.heshan.net$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name api.heshan.net;
+    ssl_certificate /etc/letsencrypt/live/api.heshan.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.heshan.net/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log off;
+    error_log /var/log/nginx/heshan-api-error.log crit;
+    client_max_body_size 32k;
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        # Overwrite user-supplied forwarding data. Review Cloudflare trusted peers separately.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+    location / { return 404; }
+}

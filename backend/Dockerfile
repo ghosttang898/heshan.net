@@ -1,4 +1,6 @@
 FROM eclipse-temurin:17-jre-jammy
+ARG VCS_REF=unversioned-test
+LABEL org.opencontainers.image.revision=$VCS_REF
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app

@@ -55,8 +55,8 @@ That requires a separately reviewed source export and owner confirmation.
 The isolated PostgreSQL integration test checks initial migration, Hibernate
 validation for all entities, repeated migration preserving inserted data,
 founder confirmation/one-time initialization/audit and second-super-admin refusal.
-It is skipped when local Docker is unavailable; that is NOT proof of PostgreSQL
-compatibility. Run it successfully before deployment. H2 security/file-persistence
+The upgraded tests require local Docker and fail rather than silently skip when
+it is unavailable. Run them successfully before deployment. H2 security/file-persistence
 tests do not substitute for this PostgreSQL test or a real data-transfer rehearsal.
 
 ## Secrets And Permissions
@@ -273,8 +273,9 @@ switch, never deleting/overwriting the original volume or automatic Flyway clean
 
 Previously generated Docker installation/logging scripts are left unchanged.
 Dependencies are selected by the existing Spring Boot dependency management;
-no framework-major upgrade is bundled into this preparation. Perform a separate
-current dependency/security support review before exposing production services.
+the subsequent supported Boot 4.1.1 upgrade and real local PostgreSQL regression
+are documented in RELEASE_CANDIDATE.md. Re-test the new SHA image on the VPS
+before exposing production services; the previous VPS image is not this upgrade.
 
 Official references:
 

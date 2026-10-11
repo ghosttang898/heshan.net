@@ -36,7 +36,7 @@ class ProductionEnvironmentGuardTest {
     }
     @Test void guardIsRegisteredAfterConfigurationLoading() {
         assertThat(org.springframework.core.io.support.SpringFactoriesLoader.loadFactoryNames(
-                org.springframework.boot.env.EnvironmentPostProcessor.class, getClass().getClassLoader()))
+                org.springframework.boot.EnvironmentPostProcessor.class, getClass().getClassLoader()))
                 .contains(ProductionEnvironmentGuard.class.getName());
         assertThat(new ProductionEnvironmentGuard().getOrder())
                 .isGreaterThan(org.springframework.boot.context.config.ConfigDataEnvironmentPostProcessor.ORDER);

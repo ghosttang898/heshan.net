@@ -15,9 +15,16 @@ async function scenario(browser, role, viewport) {
   await context.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    const cors = { "access-control-allow-origin": request.headers().origin || base,
+      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS", "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     let result;
     let status = 200;
-    if (url.pathname === "/api/auth/me") result = owner;
+    if (url.pathname === "/api/health") result = { status: "ok" };
+    else if (url.pathname === "/api/posts") result = [];
+    else if (/^\/api\/posts\/\d+\/comments$/.test(url.pathname)) result = [];
+    else if (/^\/api\/posts\/\d+$/.test(url.pathname)) result = { id: 1, title: "Fixture", content: "Public fixture", type: "CHAT", createdAt: "2026-10-01T12:00:00" };
+    else if (url.pathname === "/api/auth/me") result = owner;
     else if (/\/api\/admin\/users\/\d+\/role$/.test(url.pathname)) {
       requests.push(request.postDataJSON());
       if (conflict) { status = 409; result = {}; }
@@ -32,7 +39,7 @@ async function scenario(browser, role, viewport) {
       result = { content: items, page: 0, size: 20, totalElements: items.length, totalPages: 1 };
     } else if (/\/api\/admin\/users\/\d+$/.test(url.pathname)) result = rows.find((row) => row.id === Number(url.pathname.split("/")[4]));
     else { status = 404; result = {}; }
-    await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(result) });
+    await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(result), headers: cors });
   });
   const page = await context.newPage();
   const errors = [];

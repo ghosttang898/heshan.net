@@ -153,7 +153,9 @@ No Playwright dependency was added to the application itself. Screenshots are sa
 ## Known Limits
 
 No Web creation of a second super admin, account bans/deletions, or audit browsing UI.
-Production SQL is prepared but not deployed or validated against a live PostgreSQL here;
+Production SQL and founder initialization have passed real isolated PostgreSQL
+tests locally and the owner-reported previous VPS rehearsal; the upgraded image
+still needs its own VPS rehearsal before production deployment.
 there is no tamper-proof audit infrastructure or JWT username rename scheme.
 Renaming an account invalidates its existing username-based JWT; founder ID protection still applies.
 The default memory DB and development JWT key are unsuitable for formal authorization/production.

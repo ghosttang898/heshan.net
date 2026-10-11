@@ -4,6 +4,11 @@ Review date: 2026-10-11 (America/New_York). This is a local pre-release review,
 not authorization or execution of a production deployment, DNS switch or founder
 promotion. No VPS connection, production DB startup or Git push occurred here.
 
+This document preserves the INITIAL review snapshot. Its Git/support/build
+blockers are superseded by the completed local upgrade and validation in
+[Release candidate preparation](RELEASE_CANDIDATE.md). Public cutover still
+requires a new VPS trial of the upgraded image, HTTPS/Pages and offsite restore.
+
 ## Decision
 
 The core application/database integration is ready for the next approved staging
@@ -20,9 +25,9 @@ This review did not independently fetch those root-private reports. Archive the
 actual result.json, execution/container logs, project name, image IDs and resource
 snapshot privately; they must identify the candidate artifact being released.
 
-Live `git ls-remote origin refs/heads/main` and local HEAD both currently identify
+At the start of the initial review, `git ls-remote origin refs/heads/main` and HEAD identified
 `85fe677a1c31f596f7ecbb2c9fe0562a7b22d3fa` (Web Analytics). Numerous production
-and test fixes are modified/untracked locally: they are NOT committed or pushed.
+and test fixes were modified/untracked locally: they were NOT committed or pushed.
 Do not build a release from GitHub main assuming it contains these changes.
 The check request has not been treated as permission to publish an unreviewed
 dirty worktree. Explicitly review/stage/commit/push the intended files separately.
@@ -81,7 +86,7 @@ overlap `172.30.10.0/24`, gateway is `172.30.10.1`, and loopback 8080 is unused.
 
 ## Dependency Support Gate
 
-The POM currently uses Spring Boot 3.3.12. The official announcement states that
+The initial POM used Spring Boot 3.3.12. The official announcement states that
 3.3.13 ended OSS support for the 3.3.x line on 2025-06-19. Before public exposure,
 approve migration to a currently supported Java-17-compatible release and run
 the full regression/VPS test again, or verify an applicable commercial support
@@ -89,6 +94,11 @@ and patched-dependency plan. Do not assume the historical recommendation in that
 announcement is the current supported-version list. No framework upgrade is
 performed by this review. Inspect image/JDK/PostgreSQL/Nginx/frontend dependencies
 as well; no complete CVE scan has been run here.
+
+Subsequent action: upgraded to stable Boot 4.1.1/Java 17 and validated all backend
+tests including real local PostgreSQL/prod-profile HTTP. See RELEASE_CANDIDATE.md
+for exact dependency versions and supported migration changes. This resolves
+the framework support gate, not the remaining public-ingress/backup gates.
 
 Source: https://spring.io/blog/2025/06/19/spring-boot-3-3-13-available-now/
 
