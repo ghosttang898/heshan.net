@@ -1,0 +1,9 @@
+# Recovery overlay for the already-installed internal-only Staging release.
+services:
+  web:
+    networks:
+      application: {}
+      ingress: {}
+networks:
+  ingress:
+    driver: bridge

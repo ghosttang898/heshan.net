@@ -3,7 +3,11 @@ import PostReplies from "./PostReplies";
 import { formatUserName } from "../userName";
 import IpLocationLabel from "./IpLocationLabel";
 
-export default function FindPersonPostList({ posts, emptyText }) {
+export default function FindPersonPostList({ posts, emptyText, loading = false }) {
+  if (loading) {
+    return <section className="card"><p className="muted" role="status">正在加载寻人信息...</p></section>;
+  }
+
   if (posts.length === 0) {
     return (
       <section className="card">

@@ -23,11 +23,16 @@ class StagingNginxFixture(unittest.TestCase):
         directory = Path(tempfile.mkdtemp(prefix="heshan-staging-nginx-"))
         name = "heshan-staging-fixture-" + secrets.token_hex(6)
         image = name + ":local"
-        self.addCleanup(lambda: subprocess.run(["docker", "rm", "-f", name], capture_output=True))
         def run(*args):
             result = subprocess.run(args, capture_output=True, timeout=180)
             self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
             return result.stdout
+        internal = name + "-internal"
+        ingress = name + "-ingress"
+        for network, options in ((internal, ["--internal"]), (ingress, [])):
+            run("docker", "network", "create", *options, network)
+            self.addCleanup(lambda network=network: subprocess.run(["docker", "network", "rm", network], capture_output=True))
+        self.addCleanup(lambda: subprocess.run(["docker", "rm", "-f", name], capture_output=True))
         # Only a generated throwaway certificate enters this local fixture image.
         run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=localhost",
             "-addext", "subjectAltName=DNS:localhost", "-keyout", str(directory / "privkey.pem"), "-out", str(directory / "fullchain.pem"))
@@ -39,9 +44,17 @@ class StagingNginxFixture(unittest.TestCase):
             "COPY fullchain.pem /etc/nginx/tls/fullchain.pem\nCOPY index.html /usr/share/nginx/html/index.html\n"
             'USER 101:101\nENTRYPOINT ["nginx", "-g", "daemon off;"]\n')
         run("docker", "build", "-t", image, str(directory))
+        run("docker", "run", "--rm", "--network", "none", "--user", "101:101",
+            "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
+            "--memory", "64m", "--cpus", "0.10", "--pids-limit", "40",
+            "--tmpfs", "/tmp:size=32m,mode=1777", "--add-host", "backend:127.0.0.1",
+            "--entrypoint", "nginx", image, "-t")
         run("docker", "run", "-d", "--name", name, "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
             "--memory", "64m", "--cpus", "0.1", "--pids-limit", "40", "--tmpfs", "/tmp:size=32m,mode=1777",
-            "--add-host", "backend:127.0.0.1", "-p", "127.0.0.1::8443", image)
+            "--network", ingress, "--add-host", "backend:127.0.0.1", "-p", "127.0.0.1::8443", image)
+        run("docker", "network", "connect", internal, name)
+        networks = json.loads(run("docker", "inspect", "--format", "{{json .NetworkSettings.Networks}}", name))
+        self.assertEqual(set(networks), {internal, ingress})
         port = run("docker", "port", name, "8443").decode().strip().rsplit(":", 1)[1]
         context = ssl.create_default_context(cafile=str(directory / "fullchain.pem"))
         origin = "https://localhost:" + port
@@ -54,6 +67,9 @@ class StagingNginxFixture(unittest.TestCase):
                 except URLError:
                     time.sleep(0.5)
             else: self.fail("Nginx TLS fixture failed to become ready")
+            run("docker", "exec", name, "nginx", "-t")
+            run("docker", "exec", name, "sh", "-c",
+                "wget -q -O /dev/null http://127.0.0.1:8081/health")
             for path in ("/", "/chat", "/find", "/posts/1", "/login", "/register", "/admin/administrators"):
                 with urlopen(origin + path, context=context, timeout=5) as response:
                     self.assertEqual(response.read(), index)

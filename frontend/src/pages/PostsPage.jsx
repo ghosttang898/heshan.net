@@ -79,7 +79,7 @@ export default function PostsPage({ type }) {
             <p className="muted">加载帖子失败，请确认后端已启动。</p>
           </section>
         ) : (
-          <PostList posts={posts} emptyText={config.emptyText} />
+          <PostList posts={posts} emptyText={config.emptyText} loading={status === "loading"} />
         )}
 
         {isAuthenticated() ? (

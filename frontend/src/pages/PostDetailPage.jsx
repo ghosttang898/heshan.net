@@ -52,9 +52,14 @@ export default function PostDetailPage() {
 
   async function handleCreateComment(payload) {
     await createComment(id, payload);
-    const response = await getComments(id);
-    setComments(response.data);
-    setCommentsStatus("ready");
+    setCommentsStatus("loading");
+    try {
+      const response = await getComments(id);
+      setComments(response.data);
+      setCommentsStatus("ready");
+    } catch (error) {
+      setCommentsStatus("error");
+    }
   }
 
   if (status === "loading") {
@@ -119,7 +124,7 @@ export default function PostDetailPage() {
           {commentsStatus === "error" ? (
             <p className="muted">评论加载失败。</p>
           ) : (
-            <CommentList comments={comments} />
+            <CommentList comments={comments} loading={commentsStatus === "loading"} />
           )}
           <AddCommentForm
             onSubmit={handleCreateComment}

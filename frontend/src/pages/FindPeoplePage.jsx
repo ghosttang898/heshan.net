@@ -95,6 +95,7 @@ export default function FindPeoplePage() {
         ) : (
           <FindPersonPostList
             posts={visiblePosts}
+            loading={status === "loading"}
             emptyText="没有匹配的寻人帖子，试试换个昵称、地点或年份。"
           />
         )}

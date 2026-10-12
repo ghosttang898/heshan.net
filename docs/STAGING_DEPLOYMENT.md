@@ -51,7 +51,15 @@ flowchart LR
 配置在 `deploy/staging/`，脚本固定项目 `heshan-staging`、数据库 `heshan_staging`、
 角色 `heshan_staging_app`、Volume `heshan-staging_staging_data`。与生产的 heshan 项目、
 172.30.10.0/24 和 postgres_data 无关。Staging application 使用 172.30.20.0/24，
-仅信任固定代理 172.30.20.10/32；两个网络均 internal。不要修改项目名复用生产资源。
+仅信任固定代理 172.30.20.10/32；application 和 database 网络均 internal。仅 Web 加入独立 ingress bridge，以支持 Docker 主机的 loopback 端口映射；后端和数据库不得加入 ingress。不要修改项目名复用生产资源。
+
+### 已安装 ingress overlay 的旧 Staging
+
+本地更新的 `staging.py` 支持 `--compose-overlay`，用于所有 status/logs/backup/stop/deploy 命令。
+发现 `/etc/heshan-staging/web-ingress.override.yml` 却未提供该参数时会安全退出，避免遗漏网络配置。
+该能力尚未安装到 VPS 的旧版本控制器，不要对旧控制器直接传新参数，也不要用旧 `deploy` 重建容器。
+升级控制器/镜像须另行批准；目前已运行的 VPS 应继续使用两个 `-f` 文件的 Compose 命令。
+新版本自带 ingress 网络，新安装不需要额外 overlay；已有 overlay 必须继续保留或单独规划迁移。
 PostgreSQL 与后端均不发布端口；仅 Nginx 绑定 IPv4 loopback 18443。
 
 DB 384 MiB + 后端 768 MiB + Nginx 64 MiB = **1216 MiB 上限**，CPU 配额合计 1.05 核

@@ -1,7 +1,11 @@
 import { formatUserName } from "../userName";
 import IpLocationLabel from "./IpLocationLabel";
 
-export default function CommentList({ comments }) {
+export default function CommentList({ comments, loading = false }) {
+  if (loading) {
+    return <p className="muted" role="status">正在加载评论...</p>;
+  }
+
   if (comments.length === 0) {
     return <p className="muted">还没有评论。</p>;
   }

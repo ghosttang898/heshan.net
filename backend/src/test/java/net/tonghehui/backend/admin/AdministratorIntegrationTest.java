@@ -75,6 +75,25 @@ class AdministratorIntegrationTest {
         }
     }
 
+    @Test void editedJwtRoleOrSubjectCannotEscalatePrivileges() throws Exception {
+        String[] parts = memberToken.split("\\.");
+        var payload = json.readTree(new String(java.util.Base64.getUrlDecoder().decode(parts[1]),
+                java.nio.charset.StandardCharsets.UTF_8));
+        var forged = new java.util.LinkedHashMap<String, Object>();
+        forged.put("sub", owner.getUsername());
+        forged.put("role", "SUPER_ADMIN");
+        forged.put("exp", payload.get("exp").asLong());
+        String edited = parts[0] + "." + java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(json.writeValueAsBytes(forged)) + "." + parts[2];
+        mvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer " + edited))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer " + memberToken)
+                .header("X-Role", "SUPER_ADMIN"))
+                .andExpect(status().isForbidden());
+        assertThat(users.findById(member.getId()).orElseThrow().getRole()).isEqualTo(Role.USER);
+        assertThat(audits.count()).isZero();
+    }
+
     @Test void onlySuperAdminCanReadOrModifyAdministrators() throws Exception {
         mvc.perform(get("/h2-console/").header("Authorization", "Bearer " + adminToken)).andExpect(status().isForbidden());
         mvc.perform(get("/api/admin/administrators")).andExpect(status().isUnauthorized());

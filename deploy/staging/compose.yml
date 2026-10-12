@@ -87,6 +87,7 @@ services:
         bind: {create_host_path: false}
     networks:
       application: {ipv4_address: 172.30.20.10}
+      ingress: {}
     depends_on:
       backend: {condition: service_healthy}
     mem_limit: 64m
@@ -105,6 +106,8 @@ services:
 volumes:
   staging_data:
 networks:
+  ingress:
+    driver: bridge
   database: {internal: true}
   application:
     internal: true

@@ -77,7 +77,7 @@ def redact(text, values):
 
 
 class Docker:
-    def __init__(self, values, env_file):
+    def __init__(self, values, env_file, compose_overlay=None):
         endpoint = os.environ.get("DOCKER_HOST", "unix:///var/run/docker.sock")
         if not endpoint.startswith("unix://") or os.environ.get("DOCKER_CONTEXT"):
             raise ValueError("Only an explicit local Unix Docker socket is allowed")
@@ -85,6 +85,18 @@ class Docker:
         self.environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", "/root"),
                             "DOCKER_HOST": endpoint, **values}
         self.base = ["docker", "compose", "--project-name", PROJECT, "--env-file", str(env_file), "-f", str(COMPOSE)]
+        installed_overlay = Path("/etc/heshan-staging/web-ingress.override.yml")
+        if installed_overlay.exists() and compose_overlay is None:
+            raise ValueError("Installed ingress overlay must be preserved with --compose-overlay")
+        if compose_overlay:
+            overlay = Path(compose_overlay)
+            if (not overlay.is_absolute() or overlay.is_symlink() or not overlay.is_file()
+                    or overlay.resolve() != overlay):
+                raise ValueError("Compose overlay must be an absolute regular non-aliased file")
+            info = overlay.stat()
+            if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o600:
+                raise ValueError("Compose overlay must be owned by the executing user, mode 0600")
+            self.base.extend(["-f", str(overlay)])
 
     def run(self, args, data=None, output=None):
         result = subprocess.run(args, input=data, stdout=output or subprocess.PIPE,
@@ -112,10 +124,26 @@ def validate_model(model, values):
     backend = model["services"]["backend"]
     if backend["image"] != values["STAGING_BACKEND_IMAGE"] or backend["environment"]["DB_URL"] != "jdbc:postgresql://db:5432/heshan_staging":
         raise ValueError("Backend image/database isolation mismatch")
-    if not all(network.get("internal") for network in model["networks"].values()):
-        raise ValueError("All staging networks must be internal")
+    networks = model["networks"]
+    if (set(networks) != {"database", "application", "ingress"}
+            or not networks["database"].get("internal")
+            or not networks["application"].get("internal")
+            or networks["ingress"].get("internal")
+            or networks["ingress"].get("driver") != "bridge"):
+        raise ValueError("Only the web ingress bridge may be non-internal")
+    for service, expected in (("db", {"database"}), ("backend", {"database", "application"}),
+                              ("web", {"application", "ingress"})):
+        if set(model["services"][service]["networks"]) != expected:
+            raise ValueError("Database/backend must never join the ingress network")
     if set(model["volumes"]) != {"staging_data"} or model["volumes"]["staging_data"]["name"] != PROJECT + "_staging_data":
         raise ValueError("Unexpected staging volume")
+
+
+def check_web_access(path, required):
+    info = path.stat()
+    shift = 6 if info.st_uid == 101 else 3 if info.st_gid == 101 else 0
+    if ((info.st_mode >> shift) & required) != required:
+        raise ValueError(f"Container UID/GID 101 cannot access {path}")
 
 
 def check_artifacts(values):
@@ -132,6 +160,10 @@ def check_artifacts(values):
         raise ValueError("TLS private key must not be world-readable")
     if not ((key.st_uid == 101 and key.st_mode & 0o400) or (key.st_gid == 101 and key.st_mode & 0o040)):
         raise ValueError("TLS private key must be readable by container UID/GID 101")
+    check_web_access(tls, 0o1)
+    check_web_access(tls / "fullchain.pem", 0o4)
+    check_web_access(static, 0o5)
+    check_web_access(static / "index.html", 0o4)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(tls / "fullchain.pem", tls / "privkey.pem")
 
@@ -207,6 +239,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init-env", "preflight", "deploy", "status", "logs", "stop", "backup"])
     parser.add_argument("--env-file", required=True)
+    parser.add_argument("--compose-overlay", help="Explicitly preserve an installed private ingress overlay")
     parser.add_argument("--execute", action="store_true", help="Explicitly allow the selected mutation")
     parser.add_argument("--revision")
     parser.add_argument("--static-dir")
@@ -221,7 +254,7 @@ def main():
         init_env(args)
         return
     values = read_env(args.env_file)
-    docker = Docker(values, args.env_file)
+    docker = Docker(values, args.env_file, args.compose_overlay)
     validate_model(json.loads(docker.compose("config", "--format", "json")), values)
     if args.action in {"preflight", "deploy"}:
         preflight(docker, values)

@@ -25,6 +25,41 @@ def fixture_values():
 
 
 class StagingSafety(unittest.TestCase):
+    def test_explicit_overlay_preserved_and_private_file_required(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory).resolve() / "overlay.yml"
+            path.write_text("services: {}\n")
+            path.chmod(0o600)
+            docker = module.Docker(fixture_values(), "/tmp/fixture.env", str(path))
+            self.assertEqual(docker.base[-2:], ["-f", str(path)])
+            path.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "0600"):
+                module.Docker(fixture_values(), "/tmp/fixture.env", str(path))
+            with self.assertRaisesRegex(ValueError, "absolute"):
+                module.Docker(fixture_values(), "/tmp/fixture.env", "relative.yml")
+
+    def test_installed_overlay_cannot_be_silently_omitted(self):
+        with patch.object(Path, "exists", return_value=True):
+            with self.assertRaisesRegex(ValueError, "must be preserved"):
+                module.Docker(fixture_values(), "/tmp/fixture.env")
+
+    def test_container_access_rejects_private_directory_before_start(self):
+        path = MagicMock()
+        for uid, gid, mode, required, allowed in (
+                (0, 101, 0o40700, 1, False),
+                (0, 101, 0o40750, 1, True),
+                (0, 0, 0o40700, 5, False),
+                (0, 0, 0o40755, 5, True),
+                (0, 101, 0o100640, 4, True),
+                (0, 0, 0o100600, 4, False)):
+            with self.subTest(uid=uid, gid=gid, mode=oct(mode)):
+                path.stat.return_value = MagicMock(st_uid=uid, st_gid=gid, st_mode=mode)
+                if allowed:
+                    module.check_web_access(path, required)
+                else:
+                    with self.assertRaisesRegex(ValueError, "cannot access"):
+                        module.check_web_access(path, required)
+
     def model(self, values):
         environment = dict(os.environ, **values)
         result = subprocess.run(["docker", "compose", "--env-file", "/dev/null", "-f", str(module.COMPOSE),
@@ -52,11 +87,17 @@ class StagingSafety(unittest.TestCase):
                 self.assertIn("no-new-privileges:true", service["security_opt"])
         self.assertEqual(model["services"]["backend"]["tmpfs"], ["/tmp:size=64m,mode=1777"])
         self.assertEqual(model["services"]["web"]["user"], "101:101")
+        self.assertEqual(set(model["services"]["web"]["networks"]), {"application", "ingress"})
+        self.assertFalse(model["networks"]["ingress"].get("internal", False))
         self.assertEqual(model["services"]["backend"]["environment"]["APP_GEOLOCATION_TRUSTED_PROXIES"], "172.30.20.10/32")
 
     def test_rejects_public_ports_and_production_volume(self):
         values = fixture_values()
         for mutation in (lambda model: model["services"]["web"]["ports"][0].update(host_ip="0.0.0.0"),
+                         lambda model: model["services"]["backend"]["networks"].update(ingress={}),
+                         lambda model: model["services"]["db"]["networks"].update(ingress={}),
+                         lambda model: model["networks"]["application"].update(internal=False),
+                         lambda model: model["networks"]["ingress"].update(internal=True),
                          lambda model: model["volumes"]["staging_data"].update(name="heshan_postgres_data")):
             model = self.model(values)
             mutation(model)

@@ -46,7 +46,7 @@ export default function PostReplies({ postId }) {
 
       {expanded ? (
         <div className="reply-content">
-          {status === "loading" ? <p className="muted">正在加载回复...</p> : null}
+          {status === "loading" ? <p className="muted" role="status">正在加载回复...</p> : null}
           {status === "error" ? <p className="error-text">回复加载失败，请稍后再试。</p> : null}
           {status === "ready" ? <CommentList comments={comments} /> : null}
           <AddCommentForm

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { register } from "../api";
 import { saveAuth } from "../auth";
+import SiteHeader from "../components/SiteHeader";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -39,44 +40,47 @@ export default function RegisterPage() {
 
   return (
     <main className="page">
-      <form className="card form-grid" onSubmit={handleSubmit}>
-        <h1>注册</h1>
-        <label className="field">
-          <span>用户名</span>
-          <input
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <label className="field">
-          <span>显示名</span>
-          <input
-            name="displayName"
-            value={formData.displayName}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <label className="field">
-          <span>密码</span>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        {error ? <p className="error-text">{error}</p> : null}
-        <button className="button" type="submit" disabled={submitting}>
-          {submitting ? "注册中..." : "注册"}
-        </button>
-        <p className="muted">
-          已有账号？<Link to="/login">去登录</Link>
-        </p>
-      </form>
+      <div className="stack">
+        <SiteHeader />
+        <form className="card form-grid" onSubmit={handleSubmit}>
+          <h1>注册</h1>
+          <label className="field">
+            <span>用户名</span>
+            <input
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>显示名</span>
+            <input
+              name="displayName"
+              value={formData.displayName}
+              onChange={handleChange}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>密码</span>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </label>
+          {error ? <p className="error-text">{error}</p> : null}
+          <button className="button" type="submit" disabled={submitting}>
+            {submitting ? "注册中..." : "注册"}
+          </button>
+          <p className="muted">
+            已有账号？<Link to="/login">去登录</Link>
+          </p>
+        </form>
+      </div>
     </main>
   );
 }
