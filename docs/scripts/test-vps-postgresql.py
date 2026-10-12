@@ -139,7 +139,7 @@ def validate_compose_mounts(model):
         raise CommandFailure("Backend requires one /tmp tmpfs with size=64m and mode=1777")
 
 
-def execute(image, report_dir=None):
+def execute(image, report_dir=None, founder_username="verified-test-owner", expected_revision=None):
     project = "heshan-it-" + secrets.token_hex(6)
     directory = Path(report_dir).resolve() if report_dir else Path(tempfile.mkdtemp(prefix=project + "-", dir="/var/tmp"))
     directory.mkdir(parents=True, exist_ok=True)
@@ -147,6 +147,8 @@ def execute(image, report_dir=None):
         raise RuntimeError("Refusing to overwrite an existing test report")
     directory.chmod(0o700)
     journal = Journal(directory, project)
+    journal.report.update(backend_image=image, expected_revision=expected_revision,
+                          founder_username=founder_username, resources=[])
     journal.emit("Absolute log directory: " + str(directory))
     journal.emit("Unique Compose project: " + project)
     (directory / "project.txt").write_text(project + "\n")
@@ -204,6 +206,21 @@ def execute(image, report_dir=None):
     def record(check):
         require(True, check)
 
+    def resources(phase):
+        ids = compose("ps", "-q", label="Resource container IDs: " + phase).stdout.decode().split()
+        stats = journal.command("Container resources: " + phase,
+                                ["docker", "stats", "--no-stream", "--format", "{{json .}}", *ids],
+                                private_stdout=True).stdout.decode() if ids else ""
+        snapshot = {"phase": phase, "time": datetime.now(timezone.utc).isoformat(),
+                    "containers": [json.loads(line) for line in stats.splitlines() if line.strip()],
+                    "host_meminfo": Path("/proc/meminfo").read_text(),
+                    "host_loadavg": Path("/proc/loadavg").read_text(),
+                    "host_cpu_stat": Path("/proc/stat").read_text(),
+                    "host_disk": journal.command("Host disk: " + phase, ["df", "-Pk", str(directory)]).stdout.decode()}
+        journal.report["resources"].append(snapshot)
+        journal.save()
+        (directory / "resources.json").write_text(json.dumps(journal.report["resources"], indent=2) + "\n")
+
     def diagnostics(phase):
         # Save logs BEFORE stop and again AFTER stop; no full inspect/Env output.
         for name, args in (("containers", ("ps", "-a", "--format", "json")),
@@ -216,6 +233,9 @@ def execute(image, report_dir=None):
         try:
             ids = compose("ps", "-a", "-q", ok=False, private_stdout=True).stdout.decode().split()
             for container in ids:
+                ports = journal.command("Retained container published ports", ["docker", "inspect", "--format",
+                                        "{{json .HostConfig.PortBindings}}", container], private_stdout=True)
+                require(ports.stdout.decode().strip() in ("null", "{}"), "Retained test container has no published ports")
                 state = journal.command("Container state and health", ["docker", "inspect", "--format", "{{json .State}}", container], ok=False, private_stdout=True)
                 (directory / f"{phase}-{container}-state.json").write_text(journal.redact(state.stdout + state.stderr))
                 logs = journal.command("Retained container log", ["docker", "logs", "--timestamps", container], ok=False, private_stdout=True)
@@ -230,6 +250,10 @@ def execute(image, report_dir=None):
             inspection = journal.command("Image architecture: " + candidate,
                                          ["docker", "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", candidate])
             require(inspection.stdout.decode().strip() == "linux/amd64", "AMD64 image: " + candidate)
+        if expected_revision:
+            revision = journal.command("Backend source revision", ["docker", "image", "inspect", "--format",
+                                       '{{index .Config.Labels "org.opencontainers.image.revision"}}', image]).stdout.decode().strip()
+            require(revision == expected_revision, "Backend image matches approved Git commit")
         compose("config", "--quiet")
         model = compose("config", "--format", "json", private_stdout=True)
         journal.perform("Normalized Compose tmpfs and volume target verification",
@@ -239,7 +263,11 @@ def execute(image, report_dir=None):
         health = compose("exec", "-T", "db", "pg_isready", "-h", "127.0.0.1", "-U", "integration_app", "-d", "heshan_test")
         require(health.returncode == 0, "PostgreSQL accepts TCP connections")
         require(sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='public';") == "0", "Empty PostgreSQL schema verification")
+        require(160000 <= int(sql("SHOW server_version_num;")) < 170000, "PostgreSQL 16 server version verification")
         compose("up", "-d", "--wait", "--wait-timeout", "300", "backend")
+        if expected_revision:
+            logs = compose("logs", "--no-color", "backend", private_stdout=True).stdout.decode()
+            require("(v4.1.1)" in logs, "Spring Boot 4.1.1 startup banner verification")
         require(sql("SELECT count(*) FROM flyway_schema_history WHERE success;") == "1", "Flyway V1 migration verification")
         require(sql("SELECT rolsuper OR rolcreatedb OR rolcreaterole FROM pg_roles WHERE rolname=current_user;") == "f", "Non-privileged application DB role verification")
         # Capture only resource/port metadata, never inspect container environment.
@@ -250,14 +278,15 @@ def execute(image, report_dir=None):
         stats = journal.command("Container resource snapshot", ["docker", "stats", "--no-stream", "--format", "{{.Name}} {{.MemUsage}} {{.CPUPerc}}", *ids]).stdout
         (directory / "resources.txt").write_bytes(stats)
         (directory / "host-memory.txt").write_text(Path("/proc/meminfo").read_text())
+        resources("initial-startup")
         record("PostgreSQL startup, Flyway V1, Hibernate validate, private ports and DB role")
-        owner_name = "verified-test-owner"
+        owner_name = founder_username
         password = secrets.token_hex(16)
         journal.secrets.append(password)
         owner = request("POST", "/auth/register", {"username": owner_name, "displayName": "Test owner", "password": password, "role": "SUPER_ADMIN"})
         ordinary = request("POST", "/auth/register", {"username": "ordinary-test", "displayName": "Test user", "password": password})
         require(owner["role"] == ordinary["role"] == "USER", "Registration defaults to USER despite injected role")
-        owner_id = int(sql("SELECT id FROM users WHERE username='verified-test-owner';"))
+        owner_id = int(sql("SELECT id FROM users WHERE username='" + owner_name + "';"))
         target_id = int(sql("SELECT id FROM users WHERE username='ordinary-test';"))
         request("GET", "/admin/dashboard", token=ordinary["token"], expected=403)
         compose("stop", "backend")
@@ -277,8 +306,9 @@ def execute(image, report_dir=None):
         request("PATCH", f"/admin/users/{target_id}/role", {"role": "USER", "expectedRole": "ADMIN"}, owner["token"])
         request("GET", "/admin/posts", token=admin["token"], expected=403)
         require(sql("SELECT count(*) FROM role_change_audit;") == "3", "Missing audit")
+        resources("permissions-verified")
         record("Registration USER, founder one-time confirmation, role protection, old JWT revocation and audits")
-        sql("INSERT INTO posts(title,content,type,author_id,created_at) SELECT 'test','persistent fixture','CHAT',id,CURRENT_TIMESTAMP FROM users WHERE username='verified-test-owner'; INSERT INTO comments(content,post_id,created_at) SELECT 'test reply',id,CURRENT_TIMESTAMP FROM posts;")
+        sql("INSERT INTO posts(title,content,type,author_id,created_at) SELECT 'test','persistent fixture','CHAT',id,CURRENT_TIMESTAMP FROM users WHERE username='" + owner_name + "'; INSERT INTO comments(content,post_id,created_at) SELECT 'test reply',id,CURRENT_TIMESTAMP FROM posts;")
         compose("stop", "backend")
         # Recreate the DB container, keeping only this run's named volume.
         compose("stop", "db")
@@ -286,6 +316,7 @@ def execute(image, report_dir=None):
         compose("up", "-d", "--force-recreate", "--wait", "--wait-timeout", "240", "db")
         compose("up", "-d", "--wait", "--wait-timeout", "300", "backend")
         request("GET", "/admin/dashboard", token=owner["token"])
+        resources("persistence-verified")
         require(sql("SELECT count(*) FROM flyway_schema_history WHERE success;") == "1", "Migration rerun changed history")
         record("Named-volume persistence and repeat Flyway validation")
         compose("stop", "backend")
@@ -311,6 +342,7 @@ def execute(image, report_dir=None):
                          'i=$((i+1)); sleep 2; done; exit 1', ok=False)
         require(result.returncode == 0, "Restored application Flyway/Hibernate/health verification")
         record("pg_dump, row-for-row isolated restore and restored Hibernate validation")
+        resources("restore-verified")
         if journal.report["status"] != "FAIL":
             journal.report["status"] = "PASS"
     except (Exception, KeyboardInterrupt) as exception:
@@ -356,12 +388,18 @@ def main():
     parser.add_argument("--execute-isolated-tests", action="store_true", required=True)
     parser.add_argument("--image", required=True, help="Already-loaded backend image; never built or pulled here")
     parser.add_argument("--report-dir", help="New protected absolute report directory")
+    parser.add_argument("--founder-username", default="verified-test-owner", help="Synthetic owner in the isolated database only")
+    parser.add_argument("--expected-revision", help="Approved full Git SHA recorded in the image label")
     args = parser.parse_args()
     if not args.image or any(c.isspace() for c in args.image) or "=" in args.image:
         parser.error("Invalid image reference")
     if args.report_dir and not Path(args.report_dir).is_absolute():
         parser.error("Report directory must be absolute")
-    execute(args.image, args.report_dir)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,50}", args.founder_username):
+        parser.error("Founder test username must contain 3-50 letters, digits, underscores or hyphens")
+    if args.expected_revision and not re.fullmatch(r"[0-9a-f]{40}", args.expected_revision):
+        parser.error("Expected revision must be a full lowercase Git SHA")
+    execute(args.image, args.report_dir, args.founder_username, args.expected_revision)
 
 
 if __name__ == "__main__":

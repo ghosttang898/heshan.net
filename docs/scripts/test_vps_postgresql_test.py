@@ -1,4 +1,6 @@
 import importlib.util
+import io
+import hashlib
 from pathlib import Path
 import subprocess
 import tarfile
@@ -16,6 +18,97 @@ spec.loader.exec_module(module)
 
 
 class IsolatedTestSafety(unittest.TestCase):
+    def test_configurable_founder_and_revision_are_forwarded(self):
+        revision = "a" * 40
+        with patch.object(module, "execute") as execute, patch("sys.argv", [str(SCRIPT),
+                "--execute-isolated-tests", "--image", "fixture:" + revision,
+                "--founder-username", "ghost", "--expected-revision", revision]):
+            module.main()
+            execute.assert_called_once_with("fixture:" + revision, None, "ghost", revision)
+
+    def test_unsafe_founder_and_invalid_revision_rejected_before_docker(self):
+        for options in (("--founder-username", "ghost'; DROP TABLE users;--"),
+                        ("--expected-revision", "latest")):
+            with self.subTest(options=options), patch.object(module, "execute") as execute, \
+                    patch("sys.argv", [str(SCRIPT), "--execute-isolated-tests", "--image", "fixture:local", *options]):
+                with self.assertRaises(SystemExit):
+                    module.main()
+                execute.assert_not_called()
+
+    def test_revision_mismatch_aborts_before_compose_start(self):
+        calls = []
+        def fake(args, data=None, ok=True):
+            calls.append(args)
+            output = b"linux/amd64\n" if "{{.Os}}/{{.Architecture}}" in args else b"wrong-revision\n"
+            return subprocess.CompletedProcess(args, 0, output, b"")
+        with tempfile.TemporaryDirectory() as directory, patch.object(module, "run", side_effect=fake), \
+                patch.object(module, "local_docker_environment", return_value=None):
+            with self.assertRaises(module.CommandFailure):
+                module.execute("fixture:local", directory, "ghost", "a" * 40)
+            report = json.loads((Path(directory) / "result.json").read_text())
+            self.assertEqual(report["status"], "FAIL")
+            self.assertTrue(report["containers_stopped"])
+            self.assertFalse(any("up" in args for args in calls))
+
+    def test_release_image_archive_validation(self):
+        script = SCRIPT.with_name("run-vps-release-test.sh").read_text()
+        code = script.split('archive_ids=$(python3 - "$image" "$revision" <<\'PY\'\n', 1)[1].split("\nPY\n", 1)[0]
+        revision = "a" * 40
+        for platform, tags, label, success in (("amd64", ["fixture:" + revision], revision, True),
+                ("arm64", ["fixture:" + revision], revision, False),
+                ("amd64", ["fixture:pg-test"], revision, False),
+                ("amd64", ["fixture:" + revision], "b" * 40, False)):
+            with self.subTest(platform=platform, tags=tags, label=label), tempfile.TemporaryDirectory() as directory:
+                config = json.dumps({"os": "linux", "architecture": platform,
+                    "config": {"Labels": {"org.opencontainers.image.revision": label}}}).encode()
+                manifest = json.dumps([{"RepoTags": tags, "Config": "config.json"}]).encode()
+                with tarfile.open(Path(directory) / "backend-image.tar", "w") as archive:
+                    for name, value in (("manifest.json", manifest), ("config.json", config)):
+                        info = tarfile.TarInfo(name); info.size = len(value)
+                        archive.addfile(info, io.BytesIO(value))
+                result = subprocess.run(["python3", "-c", code, "fixture:" + revision, revision],
+                                        cwd=directory, capture_output=True)
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+
+    def test_release_wrapper_preserves_resources_and_requires_interactive_sudo(self):
+        wrapper = SCRIPT.with_name("run-vps-release-test.sh")
+        self.assertEqual(subprocess.run(["bash", "-n", str(wrapper)], capture_output=True).returncode, 0)
+        source = wrapper.read_text()
+        self.assertIn('Running containers detected; aborting', source)
+        self.assertIn('refusing to overwrite', source)
+        self.assertIn('"$image" "$founder_username" "$revision"', source)
+        for forbidden in ("sudo -S", "sudoers", "ufw", "usermod", "volume rm", "prune", "down -v"):
+            self.assertNotIn(forbidden, source)
+
+    def test_engine29_oci_archive_ids_and_descriptor_integrity(self):
+        source = SCRIPT.with_name("run-vps-release-test.sh").read_text()
+        code = source.split('archive_ids=$(python3 - "$image" "$revision" <<\'PY\'\n', 1)[1].split("\nPY\n", 1)[0]
+        revision = "a" * 40
+        image = "fixture:" + revision
+        config = json.dumps({"os": "linux", "architecture": "amd64",
+            "config": {"Labels": {"org.opencontainers.image.revision": revision}}}).encode()
+        config_id = hashlib.sha256(config).hexdigest()
+        model = json.dumps({"config": {"digest": "sha256:" + config_id}}).encode()
+        model_id = hashlib.sha256(model).hexdigest()
+        index = json.dumps({"manifests": [{"digest": "sha256:" + model_id}]}).encode()
+        index_id = hashlib.sha256(index).hexdigest()
+        for corrupt, success in ((False, True), (True, False)):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                files = {"manifest.json": json.dumps([{"RepoTags": [image], "Config": "config.json"}]).encode(),
+                         "config.json": config, "blobs/sha256/" + config_id: config,
+                         "blobs/sha256/" + model_id: b"corrupt" if corrupt else model,
+                         "blobs/sha256/" + index_id: index,
+                         "index.json": json.dumps({"manifests": [{"digest": "sha256:" + index_id,
+                             "annotations": {"io.containerd.image.name": "docker.io/library/" + image}}]}).encode()}
+                with tarfile.open(Path(directory) / "backend-image.tar", "w") as archive:
+                    for name, value in files.items():
+                        info = tarfile.TarInfo(name); info.size = len(value)
+                        archive.addfile(info, io.BytesIO(value))
+                result = subprocess.run(["python3", "-c", code, image, revision], cwd=directory, capture_output=True)
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                if success:
+                    self.assertEqual(set(result.stdout.decode().split()), {"sha256:" + item for item in (config_id, model_id, index_id)})
+
     def normalized_compose(self, *files):
         environment = dict(os.environ, TEST_BACKEND_IMAGE="fixture:local", TEST_ADMIN_PASSWORD="fixture",
                            TEST_APP_PASSWORD="fixture", TEST_JWT_SECRET="fixture", BACKEND_IMAGE="fixture:local",
@@ -89,6 +182,10 @@ class IsolatedTestSafety(unittest.TestCase):
             stdout, stderr, code = b"", b"", 0
             if args[:3] == ["docker", "image", "inspect"]:
                 stdout = b"linux/amd64\n"
+            elif "{{json .HostConfig.PortBindings}}" in args:
+                stdout = b"{}\n"
+            elif data and b"server_version_num" in data:
+                stdout = b"160013\n"
             elif "config" in args and "json" in args:
                 stdout = b'{"services":{"backend":{"tmpfs":["/tmp:size=64m,mode=1777"]}}}'
             elif "up" in args and args[-1] == "backend":
@@ -157,6 +254,10 @@ class IsolatedTestSafety(unittest.TestCase):
             stdout, stderr, code = b"", b"", 0
             if args[:3] == ["docker", "image", "inspect"]:
                 stdout = b"linux/amd64\n"
+            elif "{{json .HostConfig.PortBindings}}" in args:
+                stdout = b"{}\n"
+            elif data and b"server_version_num" in data:
+                stdout = b"160013\n"
             elif "config" in args and "json" in args:
                 stdout = b'{"services":{"backend":{"tmpfs":["/tmp:size=64m,mode=1777"]}}}'
             elif data and b"information_schema.tables" in data:

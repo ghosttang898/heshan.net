@@ -1,0 +1,112 @@
+name: heshan-staging
+services:
+  db:
+    image: postgres:16-bookworm
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${STAGING_DB_NAME:?required}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${STAGING_DB_ADMIN_PASSWORD:?required}
+      APP_DB_USER: ${STAGING_DB_USER:?required}
+      APP_DB_PASSWORD: ${STAGING_DB_PASSWORD:?required}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    command: [postgres, -c, shared_buffers=64MB, -c, work_mem=2MB, -c, maintenance_work_mem=32MB, -c, max_connections=20, -c, log_statement=none, -c, log_min_error_statement=panic]
+    volumes:
+      - staging_data:/var/lib/postgresql/data
+      - type: bind
+        source: ../postgres-init.sh
+        target: /docker-entrypoint-initdb.d/10-app-user.sh
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [database]
+    mem_limit: 384m
+    cpus: 0.35
+    pids_limit: 100
+    shm_size: 64m
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${APP_DB_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  backend:
+    image: ${STAGING_BACKEND_IMAGE:?SHA image required}
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/${STAGING_DB_NAME:?required}
+      DB_USER: ${STAGING_DB_USER:?required}
+      DB_PASSWORD: ${STAGING_DB_PASSWORD:?required}
+      APP_JWT_SECRET: ${STAGING_JWT_SECRET:?required}
+      APP_CORS_ALLOWED_ORIGINS: ${STAGING_CORS_ALLOWED_ORIGINS:?required}
+      APP_GEOLOCATION_TRUSTED_PROXIES: 172.30.20.10/32
+      JAVA_TOOL_OPTIONS: -Duser.timezone=UTC -Xms64m -Xmx320m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=32m -XX:+ExitOnOutOfMemoryError
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [database, application]
+    mem_limit: 768m
+    cpus: 0.60
+    pids_limit: 120
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "4", http://127.0.0.1:8080/actuator/health]
+      interval: 5s
+      timeout: 5s
+      start_period: 90s
+      retries: 30
+    logging: *logging
+  web:
+    image: nginx:stable-alpine
+    pull_policy: never
+    entrypoint: [nginx, -g, "daemon off;"]
+    user: "101:101"
+    restart: unless-stopped
+    ports: ["127.0.0.1:18443:8443"]
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${STAGING_STATIC_DIR:?required}
+        target: /usr/share/nginx/html
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${STAGING_TLS_DIR:?required}
+        target: /etc/nginx/tls
+        read_only: true
+        bind: {create_host_path: false}
+    networks:
+      application: {ipv4_address: 172.30.20.10}
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 64m
+    cpus: 0.10
+    pids_limit: 40
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8081/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+volumes:
+  staging_data:
+networks:
+  database: {internal: true}
+  application:
+    internal: true
+    ipam:
+      config: [{subnet: 172.30.20.0/24}]
