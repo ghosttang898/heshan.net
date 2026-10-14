@@ -3,6 +3,8 @@ set -Eeuo pipefail
 set +x
 umask 077
 [[ $# == 0 ]] || { printf 'No arguments accepted.\n' >&2; exit 1; }
+offsite=${BACKUP_OFFSITE:-0}
+[[ $offsite == 0 || $offsite == 1 ]] || { printf 'BACKUP_OFFSITE must be 0 or 1.\n' >&2; exit 1; }
 : "${ENV_FILE:?Set the absolute server-local Compose env file path}"
 : "${COMPOSE_FILE:?Set the absolute deploy/compose.yml path}"
 : "${BACKUP_DIR:?Set the absolute backup directory, matching the env file}"
@@ -22,7 +24,15 @@ partial=$(mktemp "$BACKUP_DIR/.partial.XXXXXXXX")
 [[ ! -e $BACKUP_DIR/$name ]] || exit 1
 mv -- "$partial" "$BACKUP_DIR/$name"
 (cd "$BACKUP_DIR"; sha256sum "$name" > "$name.sha256")
-# Failed offsite upload fails the job and leaves local backups intact.
-"${compose[@]}" --profile backup run --rm --no-deps offsite
-find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'heshan-*.dump' -o -name 'heshan-*.dump.sha256' \) -mmin +10080 -delete
-printf 'Database dump and offsite transfer completed.\n'
+(cd "$BACKUP_DIR"; sha256sum -c "$name.sha256")
+"${compose[@]}" exec -T db pg_restore --list < "$BACKUP_DIR/$name" > "$BACKUP_DIR/$name.toc"
+[[ -s $BACKUP_DIR/$name.toc ]] || { printf 'Empty archive listing rejected.\n' >&2; exit 1; }
+# MVP default is local-only; retained legacy offsite support needs explicit opt-in.
+if [[ $offsite == 1 ]]; then
+  "${compose[@]}" --profile backup run --rm --no-deps offsite
+  printf 'Database dump and offsite transfer completed; no backups pruned.\n'
+else
+  printf 'PASS: local dump, SHA256 and archive listing; offsite NOT RUN; no backups pruned.\n'
+fi
+# Upload exit status alone is not proof that each old remote object is intact.
+# Keep everything until an approved per-object download/SHA256 retention gate.
