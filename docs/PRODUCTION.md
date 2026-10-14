@@ -1,5 +1,12 @@
 # Production Preparation
 
+> Historical preparation reference. V1 is now live; start with
+> [V1 handover](V1_HANDOVER.md) for actual revisions and remaining work.
+> Founder initialization is complete: never rerun the example below.
+> Pages, B2/rclone, offsite automation and new controllers are paused under MVP.
+> Use the current production Compose wrapper with the GeoIP overlay; template
+> commands and obsolete paths below are not instructions to redeploy production.
+
 This change prepares local code only. No VPS connection, DNS change, database
 deployment, owner promotion, Pages deployment or Git push has been performed.
 The currently online legacy website is not touched.
@@ -165,8 +172,10 @@ enabling it; never commit the file or replace it in place while it is mapped.
 It exports a custom-format pg_dump (compression level 3) with the app role, writes
 only a new protected backup file/checksum, and invokes the optional offsite
 rclone job. It never passes database passwords in argv. Upload failure fails
-the job and keeps local backups; no retention pruning occurs before success.
-Local retention is 7 days, limited to this job's heshan-*.dump/checksum files.
+the job and keeps local backups. Upload success alone is not enough to authorize
+retention pruning; the script now performs no deletion at all. The proposed
+7-day local/30-day offsite policy and per-object verification gates are described
+in `docs/STAGING_BACKUP_AUTOMATION.md`. Historical backups are not auto-managed.
 Partial failed dumps remain for operator inspection, not blind removal.
 
 Select an **external** storage provider/bucket (not another directory/container
@@ -176,33 +185,28 @@ privately. Set an offsite lifecycle policy of 30 days; consider versioning/immut
 retention if supported. Configure that policy only after owner approval. This
 change has not contacted any storage provider or verified real offsite transfer.
 
-Proposed daily root scheduler entry, NOT installed in this change:
+Do not install the former direct cron recipe. Follow the approval gates in
+`docs/STAGING_BACKUP_AUTOMATION.md` for a resource-monitored supervisor and
+systemd timer with individually verified offsite receipts before activation.
 
-```cron
-15 3 * * * ENV_FILE=/etc/heshan/app.env COMPOSE_FILE=/opt/heshan/deploy/compose.yml BACKUP_DIR=/var/backups/heshan /bin/bash /opt/heshan/docs/scripts/backup-postgresql.sh
-```
-
-It uses server UTC, uploads dumps and checksums; arrange private failure alerts,
+The proposed schedule uses UTC and uploads dumps and checksums; arrange private failure alerts,
 monitor age/size/transfer results and verify a download from a different machine.
 Do not log credentials. Backup secrecy matters: dumps contain password hashes,
 community content, roles and audits. Env/JWT/rclone secrets need separate secure
 recovery storage, not inclusion in public/database dump directories.
 
-For monthly restore rehearsal, download an offsite dump and checksum to a trusted
-Mac/CI machine, check `sha256sum -c <name>.sha256` (on Mac use `shasum -a 256 -c`),
-then run:
+For monthly restore rehearsal, verify the offsite dump and checksum on a trusted
+machine, then obtain approval for a fully isolated target and a same-snapshot
+reference. Never restore into the real database merely to test a backup.
 
-```bash
-bash docs/scripts/test-restore-postgresql.sh /absolute/path/heshan-backup.dump
-```
-
-It permits only a local Docker socket, uses a uniquely named no-network/no-port
-temporary PostgreSQL with 512 MiB tmpfs, restores with pg_restore --exit-on-error,
-prints counts for all five tables and Flyway history, then removes only its own
-temporary container. Compare counts, sample content, founder/audit records and
-login/moderation in an isolated app against the expected backup reference. Large
-dumps need a separately approved larger isolated test store, never the production
-volume. Never restore into the real database merely to test a backup.
+The former one-argument `test-restore-postgresql.sh` command is no longer supported.
+The hardened runner currently accepts **Staging backups only**, requires explicit
+approval, a checksum-bound reference and confirmed owner ID/username, and retains
+its stopped temporary container and protected reports. See
+[the isolated Staging restore plan](STAGING_ISOLATED_RESTORE.md).
+It is not an automatic production restore tool. Production rehearsal, database
+login grants and application login/moderation need a separately approved plan;
+the dump intentionally excludes ACL/ownership.
 
 ## Cloudflare Pages
 

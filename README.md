@@ -2,6 +2,11 @@
 
 heshan.net is a simple monorepo for a full-stack web application.
 
+V1 is live at [heshan.net](https://heshan.net/). Start with the
+[V1 handover](docs/V1_HANDOVER.md) for deployed revisions, remaining work and
+next-session safety rules. New repository commits do not automatically update
+the running production image.
+
 ## Structure
 
 - `backend`: Spring Boot backend using Maven and Java 17

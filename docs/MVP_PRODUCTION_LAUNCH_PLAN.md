@@ -1,5 +1,8 @@
 # 同鹤汇 MVP 正式上线执行计划
 
+> 历史执行计划，现已按阶段批准完成上线。生产 ghost 已初始化，不可重跑。
+> 当前版本、待办和操作入口见 [V1 交接](V1_HANDOVER.md)。
+
 检查日期：2026-10-13（America/New_York）。仅检查和本地准备，未执行正式部署。
 
 ## 当前证据和限制
@@ -62,6 +65,12 @@ Staging 静态目录。TLS 私钥 root-only，不复用 localhost 测试 CA。�
    命令使用 founder-bootstrap 非 Web 入口，事务写保护身份及审计，重复初始化拒绝。
    若需停止生产 Backend 避免同时运行两个 JVM，须明确批准短暂中断；不重启数据库。
    初始化后复查登录、角色、singleton 身份和 INITIALIZE_FOUNDER 审计，不记录 JWT/密码。
+   **V1 版本的初始化参数**：prod 防护要求 Flyway 开启，不能传入
+   `--spring.flyway.enabled=false`，否则会在连接数据库前以 `prod requires Flyway` 退出。
+   对当前仅含 V1 的固定镜像，先只读确认迁移历史恰为成功的 V1，再使用
+   `--spring.flyway.enabled=true --spring.flyway.target=1 --spring.jpa.hibernate.ddl-auto=validate`。
+   保持 clean 禁用、校验开启，不跳过迁移执行来伪造历史。初始化后迁移历史指纹必须完全不变；
+   缺失、失败或额外版本均停止。失败后先查角色、绑定、审计和脱敏日志，不自动重试。
 6. **备份与正式 HTTPS（分别批准）**：空库初始化及所有者注册后各生成 pg_dump、SHA256，
    非空/归档检查，目录 0700、文件 0600，并安全下载到 Mac。每日手动备份明确负责人，
    本地至少 7 天，Mac 至少 30 天；没有已验证的另一份副本不删唯一备份。

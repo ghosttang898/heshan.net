@@ -97,6 +97,53 @@ class PostgresMigrationIntegrationTest {
             }
         }
     }
+    @Test void productionFounderBootstrapValidatesExistingV1WithoutNewMigrations() throws Exception {
+        try (var production = isolatedDatabase()) {
+            production.start();
+            var flyway = Flyway.configure().dataSource(production.getJdbcUrl(), APP_USER, APP_PASSWORD)
+                    .locations("classpath:db/migration/postgresql").cleanDisabled(true).load();
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+            var originalChecksum = flyway.info().applied()[0].getChecksum();
+            byte[] key = new byte[48]; new SecureRandom().nextBytes(key);
+            Map<String, Object> fixtureEnvironment = Map.of("APP_JWT_SECRET", Base64.getEncoder().encodeToString(key),
+                    "DB_URL", production.getJdbcUrl(), "DB_USER", APP_USER, "DB_PASSWORD", APP_PASSWORD,
+                    "APP_CORS_ALLOWED_ORIGINS", "https://isolated-test.invalid");
+            var application = new SpringApplication(FounderBootstrapCommand.BootstrapConfiguration.class);
+            application.setWebApplicationType(WebApplicationType.NONE);
+            application.setEnvironment(new StandardEnvironment() {
+                @Override public Map<String, Object> getSystemEnvironment() { return fixtureEnvironment; }
+            });
+            application.setAdditionalProfiles("prod", "founder-bootstrap");
+            String[] args = {"--spring.flyway.enabled=true", "--spring.flyway.target=1",
+                    "--spring.jpa.hibernate.ddl-auto=validate", "--spring.main.banner-mode=off",
+                    "--logging.level.root=ERROR"};
+            Long id;
+            try (var context = application.run(args)) {
+                var managedFlyway = context.getBean(Flyway.class);
+                managedFlyway.validate();
+                assertThat(managedFlyway.info().pending()).isEmpty();
+                assertThat(managedFlyway.migrate().migrationsExecuted).isZero();
+                assertThat(managedFlyway.info().applied()).hasSize(1);
+                assertThat(managedFlyway.info().applied()[0].getChecksum()).isEqualTo(originalChecksum);
+                var users = context.getBean(UserRepository.class);
+                var user = new User(); user.setUsername("confirmed-cli-owner"); user.setDisplayName("Fixture owner");
+                user.setPassword("unused-isolated-fixture"); id = users.saveAndFlush(user).getId();
+                context.getBean(FounderBootstrapService.class).initialize(id, user.getUsername(), id, user.getUsername());
+            }
+            try (var context = application.run(args)) {
+                assertThat(context.getBean(UserRepository.class).findById(id).orElseThrow().getRole()).isEqualTo(Role.SUPER_ADMIN);
+                assertThat(context.getBean(FounderIdentityRepository.class).findById(1L).orElseThrow().getUserId()).isEqualTo(id);
+                assertThat(context.getBean(RoleChangeAuditRepository.class).count()).isEqualTo(1);
+                var managedFlyway = context.getBean(Flyway.class);
+                assertThat(managedFlyway.info().applied()).hasSize(1);
+                assertThat(managedFlyway.info().applied()[0].getChecksum()).isEqualTo(originalChecksum);
+                assertThatThrownBy(() -> context.getBean(FounderBootstrapService.class)
+                        .initialize(id, "confirmed-cli-owner", id, "confirmed-cli-owner"))
+                        .isInstanceOf(IllegalStateException.class);
+            }
+        }
+    }
+
     @Test void migrateValidatePreserveRowsAndInitializeFounderOnce() throws Exception {
         var flyway = Flyway.configure().dataSource(database.getJdbcUrl(), APP_USER, APP_PASSWORD)
                 .locations("classpath:db/migration/postgresql").cleanDisabled(true).load();

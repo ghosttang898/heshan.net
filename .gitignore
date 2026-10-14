@@ -27,6 +27,9 @@ backend/target/
 .env.*
 *.env
 rclone.conf
+*.backup-crypt.conf
+*.backup-alert.conf
+*.backup-credentials.json
 *.htpasswd
 htpasswd
 .secrets/

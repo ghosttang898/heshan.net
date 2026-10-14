@@ -89,11 +89,14 @@ ssh -t -i ~/.ssh/id_ed25519 heshan@165.232.156.104 \
 不重启整个 VPS、Docker daemon 或其他项目，不执行 down -v。
 
 恢复：先验证 dump checksum，再创建新的临时 PostgreSQL 16，network none、无发布端口、
-384 MiB memory、0.5 CPU、tmpfs 数据目录；只恢复备份副本并比较记录/约束/迁移/关键字段。
+384 MiB memory、0.25 CPU、全新随机命名的专用 Volume；只恢复备份副本并比较记录/约束/迁移/关键字段。
+执行前 RAM 至少可用 768MiB、磁盘至少剩余 4GiB，过程中持续采样，不足则停止临时目标。
 恢复测试约额外消耗 384 MiB RAM 和短暂 CPU/磁盘 I/O。必须在低负载时核对内存余量。
 保留备份和结果；现有数据库和所有现有 Volume 不触碰。
-现有 test-restore-postgresql.sh 只清理它新建的 tmpfs 测试容器，不删除任何 Docker Volume。
-运行脚本前仍须所有者明确批准，不能把 archive listing 当成恢复 PASS。
+加固后的 test-restore-postgresql.sh 要求显式批准、同一备份时点的完整参考及确认的所有者 ID/用户名。
+它仅停止自己核验过的临时容器，不删除容器、Docker Volume、备份或报告。
+执行前须按 [独立恢复方案](STAGING_ISOLATED_RESTORE.md) 复核新的资源上限和参数；
+不能沿用旧单路径调用，也不能把 archive listing 当成恢复 PASS。
 
 ## 2GB VPS 资源策略
 
