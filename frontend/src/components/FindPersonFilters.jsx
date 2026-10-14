@@ -22,7 +22,7 @@
           name="year"
           value={filters.year}
           onChange={handleChange}
-          placeholder="例如：2001"
+          placeholder="例如：2001 或 2001-2005"
         />
       </label>
       <label className="field">

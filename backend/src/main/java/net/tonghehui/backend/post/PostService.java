@@ -10,6 +10,7 @@ import net.tonghehui.backend.user.User;
 import net.tonghehui.backend.user.UserRepository;
 import net.tonghehui.backend.moderation.ContentStatus;
 import net.tonghehui.backend.geolocation.IpGeolocationService;
+import net.tonghehui.backend.common.InputValidation;
 
 @Service
 public class PostService {
@@ -34,6 +35,14 @@ public class PostService {
     }
 
     public Post create(Post post, String username, String clientIp) {
+        InputValidation.text(post.getTitle(), "Title", 255, true);
+        InputValidation.text(post.getContent(), "Content", 4000, true);
+        InputValidation.text(post.getNickname(), "Nickname", 255, false);
+        InputValidation.text(post.getLocation(), "Location", 255, false);
+        InputValidation.text(post.getYearRange(), "Year range", 255, false);
+        if (post.getType() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Post type is required");
+        }
         User author = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 

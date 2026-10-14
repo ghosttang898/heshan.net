@@ -12,6 +12,7 @@ import net.tonghehui.backend.security.JwtService;
 import net.tonghehui.backend.user.User;
 import net.tonghehui.backend.user.UserRepository;
 import net.tonghehui.backend.user.Role;
+import net.tonghehui.backend.common.InputValidation;
 
 @Service
 public class AuthService {
@@ -44,6 +45,10 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required fields");
         }
 
+        InputValidation.text(username, "Username", 255, true);
+        InputValidation.text(displayName, "Display name", 255, true);
+        InputValidation.password(request.getPassword());
+
         if (userRepository.existsByUsername(username)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
         }
@@ -69,6 +74,9 @@ public class AuthService {
         if (username.isEmpty() || request.getPassword().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required fields");
         }
+
+        InputValidation.text(username, "Username", 255, true);
+        InputValidation.password(request.getPassword());
 
         try {
             authenticationManager.authenticate(

@@ -12,6 +12,7 @@ import net.tonghehui.backend.user.User;
 import net.tonghehui.backend.user.UserRepository;
 import net.tonghehui.backend.moderation.ContentStatus;
 import net.tonghehui.backend.geolocation.IpGeolocationService;
+import net.tonghehui.backend.common.InputValidation;
 
 @Service
 public class CommentService {
@@ -37,9 +38,7 @@ public class CommentService {
     }
 
     public CommentResponse create(Long postId, CreateCommentRequest request, String username, String clientIp) {
-        if (request.getContent() == null || request.getContent().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comment content is required");
-        }
+        InputValidation.text(request.getContent(), "Comment content", 2000, true);
 
         Post post = postService.findById(postId);
         Comment comment = new Comment();

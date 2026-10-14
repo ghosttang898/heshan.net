@@ -35,6 +35,9 @@ Main backend APIs include:
 
 See [Admin API and development account guide](docs/ADMIN.md) for endpoints, filters, schema changes,
 and administrator setup. Anonymous comments remain supported. Public APIs only return published content.
+
+See [MVP input validation](docs/MVP_INPUT_VALIDATION.md) for required fields,
+length limits and HTTP 400 behavior on registration, login, posts and comments.
 See [Administrator roles and founder initialization](docs/ADMIN_ROLES.md) for the three-role policy,
 auditing and the explicitly confirmed offline founder command. No founder is promoted automatically.
 See [IP location setup and privacy guide](docs/IP_LOCATION.md) for database configuration,

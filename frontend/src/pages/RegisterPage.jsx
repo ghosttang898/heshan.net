@@ -3,6 +3,7 @@ import { useState } from "react";
 import { register } from "../api";
 import { saveAuth } from "../auth";
 import SiteHeader from "../components/SiteHeader";
+import { validateRegistration, submissionError } from "../formValidation";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -24,6 +25,9 @@ export default function RegisterPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const validationError = validateRegistration(formData);
+    setError(validationError);
+    if (validationError) return;
     setSubmitting(true);
     setError("");
 
@@ -32,7 +36,7 @@ export default function RegisterPage() {
       saveAuth(response.data);
       navigate("/chat");
     } catch (requestError) {
-      setError("注册失败，用户名可能已存在。");
+      setError(submissionError(requestError, "注册失败，请稍后重试。"));
     } finally {
       setSubmitting(false);
     }
@@ -48,6 +52,8 @@ export default function RegisterPage() {
             <span>用户名</span>
             <input
               name="username"
+              maxLength={255}
+              autoComplete="username"
               value={formData.username}
               onChange={handleChange}
               required
@@ -57,6 +63,7 @@ export default function RegisterPage() {
             <span>显示名</span>
             <input
               name="displayName"
+              maxLength={255}
               value={formData.displayName}
               onChange={handleChange}
               required
@@ -67,12 +74,14 @@ export default function RegisterPage() {
             <input
               type="password"
               name="password"
+              maxLength={72}
+              autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
               required
             />
           </label>
-          {error ? <p className="error-text">{error}</p> : null}
+          {error ? <p className="error-text" role="alert">{error}</p> : null}
           <button className="button" type="submit" disabled={submitting}>
             {submitting ? "注册中..." : "注册"}
           </button>

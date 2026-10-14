@@ -1,5 +1,7 @@
 ﻿import { useState } from "react";
 
+import { validatePost, submissionError } from "../formValidation";
+
 const initialForm = {
   title: "",
   content: "",
@@ -12,6 +14,7 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
     type: defaultType,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -23,6 +26,9 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const validationError = validatePost(formData);
+    setError(validationError);
+    if (validationError) return;
     setSubmitting(true);
 
     try {
@@ -31,6 +37,8 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
         ...initialForm,
         type: defaultType,
       });
+    } catch (requestError) {
+      setError(submissionError(requestError, "发布失败，请稍后重试。"));
     } finally {
       setSubmitting(false);
     }
@@ -43,6 +51,7 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
         <span>标题</span>
         <input
           name="title"
+          maxLength={255}
           value={formData.title}
           onChange={handleChange}
           required
@@ -52,6 +61,7 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
         <span>内容</span>
         <textarea
           name="content"
+          maxLength={4000}
           value={formData.content}
           onChange={handleChange}
           required
@@ -64,6 +74,7 @@ export default function CreatePostForm({ defaultType, onSubmit }) {
           <option value="FIND_PERSON">FIND_PERSON</option>
         </select>
       </label>
+      {error ? <p className="error-text" role="alert">{error}</p> : null}
       <button className="button" type="submit" disabled={submitting}>
         {submitting ? "提交中..." : "创建帖子"}
       </button>

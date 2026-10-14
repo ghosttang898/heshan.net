@@ -6,6 +6,7 @@ import FindPersonPostList from "../components/FindPersonPostList";
 import AdminLink from "../components/AdminLink";
 import { createPost, getPosts } from "../api";
 import { clearAuth, getAuth, isAuthenticated, subscribeAuthChange } from "../auth";
+import { matchesYearSearch } from "../yearSearch";
 
 export default function FindPeoplePage() {
   const [posts, setPosts] = useState([]);
@@ -51,14 +52,12 @@ export default function FindPeoplePage() {
   const visiblePosts = posts.filter((post) => {
     const nickname = (post.nickname || "").toLowerCase();
     const location = (post.location || "").toLowerCase();
-    const yearRange = (post.yearRange || "").toLowerCase();
     const nicknameQuery = filters.nickname.trim().toLowerCase();
     const locationQuery = filters.location.trim().toLowerCase();
-    const yearQuery = filters.year.trim().toLowerCase();
 
     return (!nicknameQuery || nickname.includes(nicknameQuery))
       && (!locationQuery || location.includes(locationQuery))
-      && (!yearQuery || yearRange.includes(yearQuery));
+      && matchesYearSearch(post.yearRange, filters.year);
   });
 
   return (
